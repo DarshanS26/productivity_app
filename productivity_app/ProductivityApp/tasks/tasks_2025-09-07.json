@@ -1,0 +1,1 @@
+{"date":"2025-09-07","pending":[],"completed":[{"id":"test_task_1","title":"Test completed task","isDone":true,"createdAt":"2025-09-07T10:00:00.000","dueTime":null,"plannedHours":2,"completionDescription":"Test description","rating":4,"actualHours":2.5}]} 
