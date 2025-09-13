@@ -21,7 +21,7 @@ class HistoryEntryAdapter extends TypeAdapter<HistoryEntry> {
       actualHours: fields[1] as double,
       tasks: (fields[2] as List?)
           ?.map((dynamic e) => (e as Map).cast<dynamic, dynamic>())
-          ?.toList(),
+          .toList(),
     );
   }
 
