@@ -245,17 +245,30 @@ class _WeekCard extends StatefulWidget {
 class _WeekCardState extends State<_WeekCard> {
   late TextEditingController _nameController;
   late TextEditingController _notesController;
+  late FocusNode _notesFocusNode;
+  late ValueNotifier<bool> _isEditingNotesNotifier;
   bool _isEditing = false;
+  // ignore: unused_field
+  bool _isEditingNotes = false;
   String? _customName;
   String? _weekNotes;
   bool _showDetailedStats = false;
-  Map<String, dynamic>? _weekStats;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _notesController = TextEditingController();
+    _notesFocusNode = FocusNode();
+    _isEditingNotesNotifier = ValueNotifier<bool>(false);
+
+    // Add focus listener to save notes when focus is lost
+    _notesFocusNode.addListener(() {
+      if (!_notesFocusNode.hasFocus) {
+        _saveWeekNotes();
+      }
+    });
+
     _loadWeekName();
     _loadWeekNotes();
   }
@@ -264,6 +277,8 @@ class _WeekCardState extends State<_WeekCard> {
   void dispose() {
     _nameController.dispose();
     _notesController.dispose();
+    _notesFocusNode.dispose();
+    _isEditingNotesNotifier.dispose();
     super.dispose();
   }
 
@@ -318,6 +333,11 @@ class _WeekCardState extends State<_WeekCard> {
 
   Future<void> _saveWeekNotes() async {
     final notes = _notesController.text.trim();
+    final previousNotes = _weekNotes;
+
+    // Only save if notes have actually changed
+    if (notes == previousNotes) return;
+
     try {
       final prefs = await SharedPreferences.getInstance();
       if (notes.isEmpty) {
@@ -325,9 +345,13 @@ class _WeekCardState extends State<_WeekCard> {
       } else {
         await prefs.setString('week_notes_${widget.weekKey}', notes);
       }
-      setState(() {
-        _weekNotes = notes.isEmpty ? null : notes;
-      });
+
+      // Update state only if mounted to prevent unnecessary rebuilds
+      if (mounted) {
+        setState(() {
+          _weekNotes = notes.isEmpty ? null : notes;
+        });
+      }
     } catch (e) {
       print('Error saving week notes for ${widget.weekKey}: $e');
     }
@@ -337,6 +361,15 @@ class _WeekCardState extends State<_WeekCard> {
     setState(() {
       _isEditing = true;
     });
+  }
+
+  void _toggleNotesEdit() {
+    _isEditingNotesNotifier.value = !_isEditingNotesNotifier.value;
+  }
+
+  // Format notes with bullet points for display
+  List<String> _formatNotesWithBullets(String notes) {
+    return notes.split('\n').where((line) => line.trim().isNotEmpty).toList();
   }
 
   String _getDisplayName() {
@@ -399,13 +432,260 @@ class _WeekCardState extends State<_WeekCard> {
     };
   }
 
-  // Build all 7 days of the week
+  // Build week notes field
+  Widget _buildWeekNotesField() {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with title and edit button
+          Row(
+            children: [
+              Icon(
+                Icons.note_alt_outlined,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Week Notes',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const Spacer(),
+              // Hide header edit button when in edit mode (we have inline buttons)
+              ValueListenableBuilder<bool>(
+                valueListenable: _isEditingNotesNotifier,
+                builder: (context, isEditingNotes, child) {
+                  if (isEditingNotes) return const SizedBox.shrink();
+                  return IconButton(
+                    onPressed: _toggleNotesEdit,
+                    icon: const Icon(Icons.edit, size: 18),
+                    color: Theme.of(context).colorScheme.primary,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    tooltip: 'Edit Notes',
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Content area - Use ValueListenableBuilder for efficient rebuilds
+          ValueListenableBuilder<bool>(
+            valueListenable: _isEditingNotesNotifier,
+            builder: (context, isEditingNotes, child) {
+              return Column(
+                children: [
+                  if (isEditingNotes || _weekNotes?.isEmpty == true) ...[
+                    // Simplified action buttons - just icons, no text
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          onPressed: _toggleNotesEdit,
+                          icon: const Icon(Icons.close, size: 20),
+                          color: Colors.red,
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                          tooltip: 'Cancel editing',
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            _saveWeekNotes();
+                            _toggleNotesEdit();
+                          },
+                          icon: const Icon(Icons.check, size: 20),
+                          color: Theme.of(context).colorScheme.primary,
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                          tooltip: 'Save notes',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Edit mode - TextField
+                    TextField(
+                      controller: _notesController,
+                      focusNode: _notesFocusNode,
+                      maxLines: null, // Allow unlimited lines
+                      minLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Add notes about this week...\n• Press Enter for new lines\n• Notes will be formatted with bullets',
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surface,
+                        contentPadding: const EdgeInsets.all(12.0),
+                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontFamily: 'monospace', // Notepad-like font
+                        fontSize: 14,
+                      ),
+                      onChanged: (_) {
+                        // Debounced save - only save if focus is lost
+                        if (!_notesFocusNode.hasFocus) {
+                          _saveWeekNotes();
+                        }
+                      },
+                      onSubmitted: (_) {
+                        // Auto-save when pressing enter
+                        _saveWeekNotes();
+                      },
+                    ),
+                  ] else if (_weekNotes?.isNotEmpty == true) ...[
+                    // Display mode - Formatted notes with bullets
+                    Container(
+                      padding: const EdgeInsets.all(12.0),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(8.0),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _formatNotesWithBullets(_weekNotes!).map((line) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '• ',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    line.trim(),
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      fontStyle: FontStyle.italic,
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.9),
+                                      fontSize: 14,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ] else ...[
+                    // Empty state - make it clickable to start editing
+                    GestureDetector(
+                      onTap: _toggleNotesEdit,
+                      child: Container(
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8.0),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.note_add,
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'No notes yet - tap here or edit button to add some',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build days of the week (only past and present days, ordered from today backwards)
   List<Widget> _buildAllWeekDays() {
-    final weekDays = List.generate(7, (index) => widget.monday.add(Duration(days: index)));
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    return weekDays.map((date) {
+    // Generate all 7 days of the week
+    final weekDays = List.generate(7, (index) => widget.monday.add(Duration(days: index)));
+
+    // Filter to only include days that are today or in the past
+    final validDays = weekDays.where((date) {
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      return !dateOnly.isAfter(today);
+    }).toList();
+
+    // Sort so today comes first, then yesterday, etc.
+    validDays.sort((a, b) => b.compareTo(a));
+
+    return validDays.map((date) {
       final isToday = date.isAtSameMomentAs(today);
 
       return Padding(
@@ -558,33 +838,6 @@ class _WeekCardState extends State<_WeekCard> {
                       ),
                     ],
 
-                    const SizedBox(height: 12),
-
-                    // Week Notes
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Week Notes',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.normal,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _notesController,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            hintText: 'Add notes about this week...',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                            contentPadding: const EdgeInsets.all(8.0),
-                          ),
-                          onChanged: (_) => _saveWeekNotes(),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               );
@@ -672,6 +925,11 @@ class _WeekCardState extends State<_WeekCard> {
 
             // Show daily cards and stats when expanded
             if (widget.isExpanded) ...[
+              const SizedBox(height: 12),
+
+              // Week notes field
+              _buildWeekNotesField(),
+
               const SizedBox(height: 12),
 
               // Daily cards for all 7 days of the week
