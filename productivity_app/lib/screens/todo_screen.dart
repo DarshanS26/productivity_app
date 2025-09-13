@@ -87,7 +87,7 @@ class _ToDoScreenState extends State<ToDoScreen> {
 
         return AppCard(
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(6.0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -385,7 +385,7 @@ class _ToDoScreenState extends State<ToDoScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.all(12.0),
                             child: Text(
                               'Completed (${completedTasks.length})',
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -420,7 +420,7 @@ class _ToDoScreenState extends State<ToDoScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.all(12.0),
                             child: Text(
                               'Active (${activeTasks.length})',
                               style: Theme.of(context).textTheme.titleMedium,

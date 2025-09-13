@@ -129,7 +129,7 @@ class _JournalScreenState extends State<JournalScreen> {
               ),
             )
           : ListView.builder(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(12.0),
             itemCount: _entries.length,
             itemBuilder: (context, index) {
               final entry = _entries.reversed.toList()[index];
@@ -155,7 +155,7 @@ class _JournalScreenState extends State<JournalScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20.0),
+                  padding: const EdgeInsets.only(right: 12.0),
                   child: const Icon(Icons.delete, color: Colors.white),
                 ),
                 confirmDismiss: (direction) async {
@@ -212,7 +212,7 @@ class _JournalScreenState extends State<JournalScreen> {
                       }
                     }),
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(12.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -324,16 +324,37 @@ class _JournalEntryDialog extends StatefulWidget {
 
 class _JournalEntryDialogState extends State<_JournalEntryDialog> {
   late TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+  bool _hasUnsavedChanges = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialContent);
+    _controller.addListener(_onTextChanged);
+
+    // Auto-save functionality
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus && _hasUnsavedChanges) {
+        // Could implement auto-save here if needed
+        _hasUnsavedChanges = false;
+      }
+    });
+  }
+
+  void _onTextChanged() {
+    if (!_hasUnsavedChanges && _controller.text != widget.initialContent) {
+      setState(() {
+        _hasUnsavedChanges = true;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -341,130 +362,171 @@ class _JournalEntryDialogState extends State<_JournalEntryDialog> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Dialog(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            Icons.edit_note,
+            color: colorScheme.primary,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              widget.title,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
             ),
-          ],
+          ),
+        ],
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+      content: Container(
+        width: double.maxFinite,
+        constraints: const BoxConstraints(
+          minWidth: 400,
+          maxWidth: 600,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Icon(
-                    Icons.edit_note,
-                    color: colorScheme.primary,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                    color: colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              // Text input
-              TextField(
-                controller: _controller,
-                decoration: InputDecoration(
-                  hintText: "What's on your mind?",
-                  hintStyle: TextStyle(
-                    color: colorScheme.onSurface.withOpacity(0.5),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: colorScheme.outline.withOpacity(0.3),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: colorScheme.outline.withOpacity(0.3),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: colorScheme.primary,
-                      width: 2,
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: colorScheme.surface.withOpacity(0.3),
+        child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Text input with enhanced features
+            TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              decoration: InputDecoration(
+                hintText: "What's on your mind today?\n\n• Share your thoughts and reflections\n• Note your achievements and challenges\n• Record your feelings and insights",
+                hintStyle: TextStyle(
+                  color: colorScheme.onSurface.withOpacity(0.4),
+                  fontStyle: FontStyle.italic,
+                  height: 1.5,
                 ),
-                autofocus: true,
-                maxLines: 12,
-                keyboardType: TextInputType.multiline,
-                style: TextStyle(color: colorScheme.onSurface),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: colorScheme.outline.withOpacity(0.3),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: colorScheme.outline.withOpacity(0.3),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
+                filled: true,
+                fillColor: colorScheme.surface.withOpacity(0.5),
+                contentPadding: const EdgeInsets.all(20.0),
               ),
-              const SizedBox(height: 24),
-              
-              // Action buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+              autofocus: true,
+              maxLines: 20,
+              minLines: 12,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                height: 1.6,
+                fontSize: 16,
+              ),
+              buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _hasUnsavedChanges ? 'Unsaved changes' : 'Ready to save',
+                        style: TextStyle(
+                          color: _hasUnsavedChanges ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.6),
+                          fontSize: 12,
+                          fontWeight: _hasUnsavedChanges ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final content = _controller.text.trim();
-                        if (content.isNotEmpty) {
-                          widget.onSave(content);
-                          Navigator.of(context).pop();
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      Text(
+                        '${currentLength} characters',
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withOpacity(0.6),
+                          fontSize: 12,
                         ),
                       ),
-                      child: const Text('Save'),
-                    ),
+                    ],
                   ),
-                ],
+                );
+              },
+            ),
+            if (_hasUnsavedChanges)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Your changes will be saved when you tap Save',
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+          ),
         ),
-      ),
+        actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final content = _controller.text.trim();
+            if (content.isNotEmpty) {
+              widget.onSave(content);
+              Navigator.of(context).pop();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please write something before saving'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            backgroundColor: _hasUnsavedChanges ? colorScheme.primary : colorScheme.primary.withOpacity(0.8),
+          ),
+          child: Text(_hasUnsavedChanges ? 'Save Changes' : 'Save'),
+        ),
+      ],
     );
   }
 }

@@ -167,7 +167,7 @@ class HistoryScreenState extends State<HistoryScreen> with WidgetsBindingObserve
         title: Text('History'),
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         itemCount: weeks.length,
         itemBuilder: (context, index) {
           final week = weeks[index];
@@ -358,9 +358,15 @@ class _WeekCardState extends State<_WeekCard> {
   }
 
   void _startEditing() {
-    setState(() {
-      _isEditing = true;
-    });
+    // Only allow editing if the week is already expanded
+    if (widget.isExpanded) {
+      setState(() {
+        _isEditing = true;
+      });
+    } else {
+      // If collapsed, expand the week instead
+      widget.onToggleWeekExpansion();
+    }
   }
 
   void _toggleNotesEdit() {
@@ -852,76 +858,74 @@ class _WeekCardState extends State<_WeekCard> {
   Widget build(BuildContext context) {
     return AppCard(
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Week header - tappable to expand/collapse or edit
-            if (widget.isExpanded) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _startEditing,
-                      behavior: HitTestBehavior.opaque,
-                      child: widget.isExpanded && _isEditing
-                          ? TextField(
-                              controller: _nameController,
-                              autofocus: true,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
+            // Week header - entire card is tappable to expand/collapse
+            GestureDetector(
+              onTap: widget.onToggleWeekExpansion,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: widget.isExpanded ? Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _startEditing,
+                        behavior: HitTestBehavior.translucent,
+                        child: widget.isExpanded && _isEditing
+                            ? TextField(
+                                controller: _nameController,
+                                autofocus: true,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onSubmitted: (_) => _saveWeekName(),
+                                onEditingComplete: _saveWeekName,
+                              )
+                            : Text(
+                                _getDisplayName(),
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
                               ),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              onSubmitted: (_) => _saveWeekName(),
-                              onEditingComplete: _saveWeekName,
-                            )
-                          : Text(
-                              '${_getDisplayName()} - ${DateFormat('MMM d').format(widget.monday)} to ${DateFormat('MMM d, yyyy').format(widget.monday.add(const Duration(days: 6)))}',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
+                      ),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: widget.onToggleWeekExpansion,
-                    child: Icon(
+                    Icon(
                       Icons.expand_less,
                       size: 24,
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                     ),
-                  ),
-                ],
-              ),
-            ] else ...[
-              GestureDetector(
-                onTap: widget.onToggleWeekExpansion,
-                behavior: HitTestBehavior.opaque,
-                child: Row(
+                  ],
+                ) : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        _getDisplayName(),
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                    Text(
+                      _getDisplayName(),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
                       ),
                     ),
-                    Icon(
-                      Icons.expand_more,
-                      size: 24,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${DateFormat('MMM d').format(widget.monday)} to ${DateFormat('MMM d, yyyy').format(widget.monday.add(const Duration(days: 6)))}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.normal,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
 
             // Show daily cards and stats when expanded
             if (widget.isExpanded) ...[
@@ -1007,7 +1011,7 @@ class _HistoryCardState extends State<_HistoryCard> {
           final totalHours = totalPlanned;
 
           return AppCard(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(6.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1058,7 +1062,7 @@ class _HistoryCardState extends State<_HistoryCard> {
           final totalHours = totalPlanned;
 
           return AppCard(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(6.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1260,17 +1264,26 @@ class _TaskItem extends StatelessWidget {
                     ),
                   ),
 
+                // Hours text with consistent spacing
                 if (task.plannedHours > 0)
                   Text(
                     '${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)} h',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
+
+                // Consistent spacing for alignment (whether arrow exists or not)
                 const SizedBox(width: 8),
-                Icon(
-                  isExpanded ? Icons.expand_less : Icons.expand_more,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                ),
+
+                // Only show arrow if there are notes or rating
+                if (task.completionDescription?.isNotEmpty == true || task.rating != null)
+                  Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  )
+                else
+                  // Invisible placeholder to maintain alignment
+                  const SizedBox(width: 20, height: 20),
               ],
             ),
           ),
