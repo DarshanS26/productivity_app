@@ -244,20 +244,26 @@ class _WeekCard extends StatefulWidget {
 
 class _WeekCardState extends State<_WeekCard> {
   late TextEditingController _nameController;
+  late TextEditingController _notesController;
   bool _isEditing = false;
   String? _customName;
+  String? _weekNotes;
   bool _showDetailedStats = false;
+  Map<String, dynamic>? _weekStats;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
+    _notesController = TextEditingController();
     _loadWeekName();
+    _loadWeekNotes();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -268,6 +274,26 @@ class _WeekCardState extends State<_WeekCard> {
         _customName = name;
         _nameController.text = name ?? 'Week ${widget.weekNumber}';
       });
+    }
+  }
+
+  Future<void> _loadWeekNotes() async {
+    final notes = await _loadWeekNotesFromPrefs(widget.weekKey);
+    if (mounted) {
+      setState(() {
+        _weekNotes = notes;
+        _notesController.text = notes ?? '';
+      });
+    }
+  }
+
+  Future<String?> _loadWeekNotesFromPrefs(String weekKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('week_notes_$weekKey');
+    } catch (e) {
+      print('Error loading week notes for $weekKey: $e');
+      return null;
     }
   }
 
@@ -290,6 +316,23 @@ class _WeekCardState extends State<_WeekCard> {
     }
   }
 
+  Future<void> _saveWeekNotes() async {
+    final notes = _notesController.text.trim();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (notes.isEmpty) {
+        await prefs.remove('week_notes_${widget.weekKey}');
+      } else {
+        await prefs.setString('week_notes_${widget.weekKey}', notes);
+      }
+      setState(() {
+        _weekNotes = notes.isEmpty ? null : notes;
+      });
+    } catch (e) {
+      print('Error saving week notes for ${widget.weekKey}: $e');
+    }
+  }
+
   void _startEditing() {
     setState(() {
       _isEditing = true;
@@ -302,7 +345,8 @@ class _WeekCardState extends State<_WeekCard> {
 
   // Calculate week statistics
   Future<Map<String, dynamic>> _calculateWeekStats() async {
-    double totalHours = 0.0;
+    double totalHours = 0.0; // Sum of all planned hours (completed + incomplete)
+    double completedHours = 0.0; // Sum of planned hours for completed tasks
     int currentStreak = 0;
     int maxStreak = 0;
     double bestDayHours = 0.0;
@@ -317,20 +361,22 @@ class _WeekCardState extends State<_WeekCard> {
         final provider = Provider.of<TaskProvider>(context, listen: false);
         final dayTasks = await provider.loadTasksForDate(day);
 
-        // Calculate completed tasks and hours
+        // Calculate all planned hours and completed hours
+        final allPlanned = dayTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
         final completedTasks = dayTasks.where((t) => t.isDone).toList();
-        final dayHours = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
+        final completedPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
 
-        totalHours += dayHours;
+        totalHours += allPlanned;
+        completedHours += completedPlanned;
 
-        // Update best day
-        if (dayHours > bestDayHours) {
-          bestDayHours = dayHours;
+        // Update best day (based on completed hours)
+        if (completedPlanned > bestDayHours) {
+          bestDayHours = completedPlanned;
           bestDay = day;
         }
 
         // Update streak (consecutive days with completed tasks)
-        if (dayHours > 0) {
+        if (completedPlanned > 0) {
           currentStreak++;
           if (currentStreak > maxStreak) {
             maxStreak = currentStreak;
@@ -346,6 +392,7 @@ class _WeekCardState extends State<_WeekCard> {
 
     return {
       'totalHours': totalHours,
+      'completedHours': completedHours,
       'streak': maxStreak,
       'bestDay': bestDay,
       'bestDayHours': bestDayHours,
@@ -406,7 +453,7 @@ class _WeekCardState extends State<_WeekCard> {
 
         // Detailed stats
         if (_showDetailedStats) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           FutureBuilder<Map<String, dynamic>>(
             future: _calculateWeekStats(),
             builder: (context, snapshot) {
@@ -421,7 +468,7 @@ class _WeekCardState extends State<_WeekCard> {
               final stats = snapshot.data ?? {};
 
               return Container(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(12.0),
@@ -443,13 +490,32 @@ class _WeekCardState extends State<_WeekCard> {
                         const SizedBox(width: 8),
                         Text(
                           'Total Hours: ${(stats['totalHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w500,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.normal,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
+
+                    // Completed hours
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 20,
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Completed Hours: ${(stats['completedHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
 
                     // Streak
                     Row(
@@ -462,13 +528,13 @@ class _WeekCardState extends State<_WeekCard> {
                         const SizedBox(width: 8),
                         Text(
                           'Streak: ${(stats['streak'] as int?) ?? 0} days',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w500,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.normal,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
 
                     // Best day
                     if (stats['bestDay'] != null) ...[
@@ -483,14 +549,42 @@ class _WeekCardState extends State<_WeekCard> {
                           Expanded(
                             child: Text(
                               'Best Day: ${DateFormat('EEEE').format(stats['bestDay'] as DateTime)} (${(stats['bestDayHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h)',
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w500,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.normal,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ],
+
+                    const SizedBox(height: 12),
+
+                    // Week Notes
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Week Notes',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: _notesController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            hintText: 'Add notes about this week...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                            contentPadding: const EdgeInsets.all(8.0),
+                          ),
+                          onChanged: (_) => _saveWeekNotes(),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               );
@@ -505,59 +599,85 @@ class _WeekCardState extends State<_WeekCard> {
   Widget build(BuildContext context) {
     return AppCard(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Week header - tappable to expand/collapse or edit
-            GestureDetector(
-              onTap: widget.isExpanded ? _startEditing : widget.onToggleWeekExpansion,
-              behavior: HitTestBehavior.opaque,
-              child: Row(
+            if (widget.isExpanded) ...[
+              Row(
                 children: [
                   Expanded(
-                    child: widget.isExpanded && _isEditing
-                        ? TextField(
-                            controller: _nameController,
-                            autofocus: true,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
+                    child: GestureDetector(
+                      onTap: _startEditing,
+                      behavior: HitTestBehavior.opaque,
+                      child: widget.isExpanded && _isEditing
+                          ? TextField(
+                              controller: _nameController,
+                              autofocus: true,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onSubmitted: (_) => _saveWeekName(),
+                              onEditingComplete: _saveWeekName,
+                            )
+                          : Text(
+                              '${_getDisplayName()} - ${DateFormat('MMM d').format(widget.monday)} to ${DateFormat('MMM d, yyyy').format(widget.monday.add(const Duration(days: 6)))}',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                             ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onSubmitted: (_) => _saveWeekName(),
-                            onEditingComplete: _saveWeekName,
-                          )
-                        : Text(
-                            widget.isExpanded
-                                ? '${_getDisplayName()} - ${DateFormat('MMM d').format(widget.monday)} to ${DateFormat('MMM d, yyyy').format(widget.monday.add(const Duration(days: 6)))}'
-                                : _getDisplayName(),
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
+                    ),
                   ),
-                  Icon(
-                    widget.isExpanded ? Icons.expand_less : Icons.expand_more,
-                    size: 24,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  GestureDetector(
+                    onTap: widget.onToggleWeekExpansion,
+                    child: Icon(
+                      Icons.expand_less,
+                      size: 24,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    ),
                   ),
                 ],
               ),
-            ),
+            ] else ...[
+              GestureDetector(
+                onTap: widget.onToggleWeekExpansion,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _getDisplayName(),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.expand_more,
+                      size: 24,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             // Show daily cards and stats when expanded
             if (widget.isExpanded) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Daily cards for all 7 days of the week
               ..._buildAllWeekDays(),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Stats toggle and display
               _buildWeekStatsSection(),
@@ -629,20 +749,18 @@ class _HistoryCardState extends State<_HistoryCard> {
           final totalHours = totalPlanned;
 
           return AppCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCardHeader(
-                    tasks: tasks,
-                    totalPlanned: totalPlanned,
-                    totalHours: totalHours,
-                  ),
-                  if (widget.isExpanded)
-                    _buildTodayTaskList(tasks: tasks),
-                ],
-              ),
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(
+                  tasks: tasks,
+                  totalPlanned: totalPlanned,
+                  totalHours: totalHours,
+                ),
+                if (widget.isExpanded)
+                  _buildTodayTaskList(tasks: tasks),
+              ],
             ),
           );
         },
@@ -682,20 +800,18 @@ class _HistoryCardState extends State<_HistoryCard> {
           final totalHours = totalPlanned;
 
           return AppCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCardHeader(
-                    tasks: tasks,
-                    totalPlanned: totalPlanned,
-                    totalHours: totalHours,
-                  ),
-                  if (widget.isExpanded)
-                    _buildArchivedTaskList(tasks: tasks),
-                ],
-              ),
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(
+                  tasks: tasks,
+                  totalPlanned: totalPlanned,
+                  totalHours: totalHours,
+                ),
+                if (widget.isExpanded)
+                  _buildArchivedTaskList(tasks: tasks),
+              ],
             ),
           );
         },
@@ -746,12 +862,12 @@ class _HistoryCardState extends State<_HistoryCard> {
               children: [
                 Text(
                   widget.isToday ? 'Today' : DateFormat('EEEE, MMMM d, yyyy').format(widget.date),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.normal),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '$tasksAdded tasks • $tasksCompleted completed',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                 ),
@@ -770,7 +886,7 @@ class _HistoryCardState extends State<_HistoryCard> {
   Widget _buildTodayTaskList({required List<Task> tasks}) {
     if (tasks.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.only(top: 16.0),
+        padding: EdgeInsets.only(top: 8.0),
         child: Text('No tasks for today yet.', style: TextStyle(color: Colors.grey)),
       );
     }
@@ -791,7 +907,7 @@ class _HistoryCardState extends State<_HistoryCard> {
   Widget _buildArchivedTaskList({required List<Task> tasks}) {
     if (tasks.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.only(top: 16.0),
+        padding: EdgeInsets.only(top: 8.0),
         child: Text('No tasks were recorded for this day.', style: TextStyle(color: Colors.grey)),
       );
     }
@@ -815,7 +931,7 @@ class _HistoryCardState extends State<_HistoryCard> {
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: totalHours > 0
               ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
@@ -828,8 +944,8 @@ class _HistoryCardState extends State<_HistoryCard> {
             color: totalHours > 0
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
+            fontWeight: FontWeight.normal,
+            fontSize: 12,
           ),
         ),
       ),
@@ -859,7 +975,7 @@ class _TaskItem extends StatelessWidget {
           onTap: onToggleExpansion,
           behavior: HitTestBehavior.opaque,
           child: Padding(
-            padding: const EdgeInsets.only(top: 12.0),
+            padding: const EdgeInsets.only(top: 8.0),
             child: Row(
               children: [
                 Icon(
@@ -905,8 +1021,8 @@ class _TaskItem extends StatelessWidget {
         // Expanded completion details
         if (isExpanded && (task.completionDescription?.isNotEmpty == true || task.rating != null))
           Container(
-            margin: const EdgeInsets.only(top: 8.0, left: 32.0, right: 8.0),
-            padding: const EdgeInsets.all(12.0),
+            margin: const EdgeInsets.only(top: 4.0, left: 32.0, right: 8.0),
+            padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
               borderRadius: BorderRadius.circular(8.0),
@@ -923,7 +1039,7 @@ class _TaskItem extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: Text(
                       task.completionDescription!,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
                         fontStyle: FontStyle.italic,
                       ),
