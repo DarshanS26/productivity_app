@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:productivity_app/models/task.dart';
-import '../../providers/task_provider.dart';
+import '../models/models.dart';
+import '../task_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 
@@ -177,8 +177,8 @@ class _HistoryCardState extends State<_HistoryCard> {
           final tasks = provider.tasks;
           final completedTasks = tasks.where((t) => t.isDone).toList();
           final totalPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
-          // Calculate actual hours from tasks instead of using local state
-          final actualHoursFromTasks = completedTasks.fold<double>(0.0, (sum, task) => sum + (task.actualHours ?? 0.0));
+          // Use sum of planned hours for completed tasks
+          final totalHours = totalPlanned;
 
           return AppCard(
             child: Padding(
@@ -189,7 +189,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                   _buildCardHeader(
                     tasks: tasks,
                     totalPlanned: totalPlanned,
-                    actualHours: actualHoursFromTasks,
+                    totalHours: totalHours,
                   ),
                   if (widget.isExpanded)
                     _buildTodayTaskList(tasks: tasks),
@@ -231,7 +231,7 @@ class _HistoryCardState extends State<_HistoryCard> {
           final tasks = snapshot.data ?? [];
           final completedTasks = tasks.where((t) => t.isDone).toList();
           final totalPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
-          final actualHours = completedTasks.fold<double>(0.0, (sum, task) => sum + (task.actualHours ?? 0.0));
+          final totalHours = totalPlanned;
 
           return AppCard(
             child: Padding(
@@ -242,7 +242,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                   _buildCardHeader(
                     tasks: tasks,
                     totalPlanned: totalPlanned,
-                    actualHours: actualHours,
+                    totalHours: totalHours,
                   ),
                   if (widget.isExpanded)
                     _buildArchivedTaskList(tasks: tasks),
@@ -275,11 +275,11 @@ class _HistoryCardState extends State<_HistoryCard> {
   }
 
 
-  // NEW: Updated to accept parameters from reactive build
+  // Updated to accept parameters from reactive build
   Widget _buildCardHeader({
     required List<Task> tasks,
     required double totalPlanned,
-    required double actualHours,
+    required double totalHours,
   }) {
     final tasksAdded = widget.isToday ? tasks.length : tasks.length;
     final tasksCompleted = widget.isToday
@@ -311,7 +311,7 @@ class _HistoryCardState extends State<_HistoryCard> {
             ),
           ),
           _buildActualHoursWidget(
-            actualHours: actualHours,
+            totalHours: totalHours,
           ),
         ],
       ),
@@ -352,22 +352,22 @@ class _HistoryCardState extends State<_HistoryCard> {
 
   // Simple widget to display total hours worked
   Widget _buildActualHoursWidget({
-    required double actualHours,
+    required double totalHours,
   }) {
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: actualHours > 0
+          color: totalHours > 0
               ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
               : Theme.of(context).colorScheme.surfaceVariant,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
-          actualHours > 0 ? '${actualHours.toStringAsFixed(1)}h' : '0.0h',
+          totalHours > 0 ? '${totalHours.toStringAsFixed(1)}h' : '0.0h',
           style: TextStyle(
-            color: actualHours > 0
+            color: totalHours > 0
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.bold,
@@ -383,7 +383,7 @@ class _HistoryCardState extends State<_HistoryCard> {
 class _TaskItem extends StatelessWidget {
   final String title;
   final bool isDone;
-  final int plannedHours;
+  final double plannedHours;
 
   const _TaskItem({required this.title, required this.isDone, required this.plannedHours});
 
@@ -401,7 +401,7 @@ class _TaskItem extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Text(title, style: const TextStyle(fontSize: 16))),
           if (plannedHours > 0)
-            Text('$plannedHours h', style: Theme.of(context).textTheme.bodySmall),
+            Text('${plannedHours % 1 == 0 ? plannedHours.toInt() : plannedHours.toStringAsFixed(1)} h', style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

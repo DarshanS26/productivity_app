@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'task.dart';
+part of 'models.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
@@ -22,16 +22,17 @@ class TaskAdapter extends TypeAdapter<Task> {
       isDone: fields[2] as bool,
       createdAt: fields[3] as DateTime,
       dueTime: fields[4] as TimeOfDay?,
-      plannedHours: fields[5] as int,
+      plannedHours: fields[5] as double,
       completionDescription: fields[6] as String?,
       rating: fields[7] as int?,
+      actualHours: fields[8] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Task obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class TaskAdapter extends TypeAdapter<Task> {
       ..writeByte(6)
       ..write(obj.completionDescription)
       ..writeByte(7)
-      ..write(obj.rating);
+      ..write(obj.rating)
+      ..writeByte(8)
+      ..write(obj.actualHours);
   }
 
   @override

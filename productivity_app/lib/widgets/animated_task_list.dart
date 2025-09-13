@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import '../models/task.dart';
+import '../models/models.dart';
 import '../widgets/app_card.dart';
 
 class AnimatedTaskList extends StatefulWidget {
@@ -134,7 +134,7 @@ class _AnimatedTaskListState extends State<AnimatedTaskList> with AutomaticKeepA
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4.0),
                                         child: Text(
-                                          'Planned: ${task.plannedHours}h',
+                                          'Planned: ${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h',
                                           style: Theme.of(context).textTheme.bodySmall,
                                         ),
                                       ),

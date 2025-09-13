@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'archived_task.dart';
+part of 'models.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
@@ -22,7 +22,7 @@ class ArchivedTaskAdapter extends TypeAdapter<ArchivedTask> {
       isDone: fields[2] as bool,
       createdAt: fields[3] as DateTime,
       dueTime: fields[4] as TimeOfDay?,
-      plannedHours: fields[5] as int,
+      plannedHours: fields[5] as double,
       completionDescription: fields[6] as String?,
       rating: fields[7] as int?,
     );

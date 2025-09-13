@@ -2,9 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
+import 'package:provider/provider.dart';
 import 'package:productivity_app/main.dart';
-import 'package:productivity_app/models/journal_entry.dart';
-import 'package:productivity_app/models/task.dart';
+import 'package:productivity_app/models/models.dart';
+import 'package:productivity_app/task_provider.dart';
 
 void main() {
   // A mock Hive setup for testing is required.
@@ -25,7 +26,19 @@ void main() {
 
   testWidgets('App navigation smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const ProductivityApp());
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (context) => TaskProvider(),
+          ),
+        ],
+        child: const ProductivityApp(),
+      ),
+    );
+
+    // Wait for the widget to build
+    await tester.pump();
 
     // Verify that our app starts on the To-Do screen.
     expect(find.text('To-Do'), findsOneWidget);

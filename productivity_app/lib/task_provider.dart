@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
-import '../models/task.dart';
-import '../services/storage_service.dart';
+import 'models/models.dart';
+import 'services/storage_service.dart';
 
 class TaskProvider extends ChangeNotifier {
   // Today's tasks in memory (single source of truth for today)

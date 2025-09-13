@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/journal_entry.dart';
+import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 

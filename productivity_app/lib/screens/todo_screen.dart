@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart'; // NEW: For TaskProvider
-import '../../providers/task_provider.dart'; // NEW: Import TaskProvider
-import '../models/task.dart';
+import '../task_provider.dart'; // NEW: Import TaskProvider
+import '../models/models.dart';
 import '../widgets/app_card.dart';
 import '../widgets/completion_details_dialog.dart';
 
@@ -168,7 +168,7 @@ class _ToDoScreenState extends State<ToDoScreen> {
                         Padding(
                           padding: const EdgeInsets.only(top: 4.0),
                           child: Text(
-                            'Planned: ${task.plannedHours}h',
+                            'Planned: ${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
@@ -265,7 +265,7 @@ class _ToDoScreenState extends State<ToDoScreen> {
                     TextField(
                       controller: hoursController,
                       decoration: InputDecoration(
-                        hintText: "Planned Hours",
+                        hintText: "Planned Hours (e.g., 1.5, 2.25)",
                         hintStyle: TextStyle(
                           color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
                           fontSize: 14,
@@ -273,9 +273,9 @@ class _ToDoScreenState extends State<ToDoScreen> {
                         ),
                         contentPadding: const EdgeInsets.only(bottom: 12, top: 8),
                       ),
-                      keyboardType: TextInputType.number,
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: <TextInputFormatter>[
-                        FilteringTextInputFormatter.digitsOnly
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                       ],
                       style: const TextStyle(),
                     ),
@@ -309,22 +309,39 @@ class _ToDoScreenState extends State<ToDoScreen> {
                 ),
                 TextButton(
                   onPressed: () async {
-                    final String title = taskController.text;
-                    if (title.isNotEmpty) {
-                      final int plannedHours = int.tryParse(hoursController.text) ?? 0;
-                      final newTask = Task(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: title,
-                        createdAt: DateTime.now(),
-                        dueTime: selectedTime,
-                        plannedHours: plannedHours,
+                    final String title = taskController.text.trim();
+                    final String hoursText = hoursController.text.trim();
+
+                    if (title.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter a task title')),
                       );
-                      final provider = Provider.of<TaskProvider>(context, listen: false);
-                      await provider.addTask(newTask);
-                      print('Task added, calling callback');
-                      widget.onTasksUpdated?.call();
-                      Navigator.pop(context);
+                      return;
                     }
+
+                    double plannedHours = 0.0;
+                    if (hoursText.isNotEmpty) {
+                      plannedHours = double.tryParse(hoursText) ?? -1.0;
+                      if (plannedHours < 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please enter a valid positive number for hours')),
+                        );
+                        return;
+                      }
+                    }
+
+                    final newTask = Task(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      title: title,
+                      createdAt: DateTime.now(),
+                      dueTime: selectedTime,
+                      plannedHours: plannedHours,
+                    );
+                    final provider = Provider.of<TaskProvider>(context, listen: false);
+                    await provider.addTask(newTask);
+                    print('Task added, calling callback');
+                    widget.onTasksUpdated?.call();
+                    Navigator.pop(context);
                   },
                   child: const Text('Add'),
                 ),

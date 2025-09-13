@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart'; // NEW: For state management
-import 'providers/task_provider.dart'; // NEW: Import TaskProvider
+import 'task_provider.dart'; // NEW: Import TaskProvider
 import 'services/storage_service.dart';
 import 'screens/todo_screen.dart';
 import 'screens/journal_screen.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/task.dart';
+import '../models/models.dart';
 import 'star_rating.dart';
-import 'animated_dialog.dart';
+import 'animated_widgets.dart';
 
 class CompletionDetailsDialog extends StatefulWidget {
   final Task task;

@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'history_entry.dart';
+part of 'models.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
@@ -18,9 +18,10 @@ class HistoryEntryAdapter extends TypeAdapter<HistoryEntry> {
     };
     return HistoryEntry(
       date: fields[0] as DateTime,
-      // Safely handle both int and double from storage.
-      actualHours: (fields[1] as num).toDouble(),
-      tasks: (fields[2] as List).cast<Map>(),
+      actualHours: fields[1] as double,
+      tasks: (fields[2] as List?)
+          ?.map((dynamic e) => (e as Map).cast<dynamic, dynamic>())
+          ?.toList(),
     );
   }
 
