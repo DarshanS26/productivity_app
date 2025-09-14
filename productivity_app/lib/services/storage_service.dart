@@ -521,6 +521,7 @@ extension on Task {
       'plannedHours': plannedHours,
       'completionDescription': completionDescription,
       'rating': rating,
+      'actualHours': actualHours,
     };
   }
 }

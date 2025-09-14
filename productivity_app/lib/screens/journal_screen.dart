@@ -18,8 +18,6 @@ class _JournalScreenState extends State<JournalScreen> {
   List<JournalEntry> _entries = [];
   // ignore: unused_field
   List<DateTime> _availableDates = [];
-  // ignore: unused_field
-  String? _hoveredEntryId;
 
   @override
   void initState() {
@@ -150,9 +148,6 @@ class _JournalScreenState extends State<JournalScreen> {
             itemBuilder: (context, index) {
               final entry = _entries.reversed.toList()[index];
               final isExpanded = _expandedEntries.contains(entry.id);
-              final contentPreview = entry.content.length > 150
-                  ? '${entry.content.substring(0, 150)}...'
-                  : entry.content;
 
               return Dismissible(
                 key: Key(entry.id),
@@ -224,64 +219,19 @@ class _JournalScreenState extends State<JournalScreen> {
                     await _loadEntries();
                   }
                 },
-                child:
-                MouseRegion(
-                  onEnter: (_) => setState(() => _hoveredEntryId = entry.id),
-                  onExit: (_) => setState(() => _hoveredEntryId = null),
-                  child: Card(
-                    margin: const EdgeInsets.symmetric(vertical: 6.0),
-                    color: const Color(0xFF1E1E1E), // Slightly lighter grey than background
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    elevation: 0, // Flat design, no shadow
-                    child: InkWell(
-                      onTap: () => setState(() {
-                        if (isExpanded) {
-                          _expandedEntries.remove(entry.id);
-                        } else {
-                          // Clear all other expanded entries first
-                          _expandedEntries.clear();
-                          // Then expand the current entry
-                          _expandedEntries.add(entry.id);
-                        }
-                      }),
-                      borderRadius: BorderRadius.circular(12.0),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isExpanded ? entry.content : contentPreview,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                height: 1.5,
-                              ),
-                              maxLines: isExpanded ? null : 3,
-                              overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today_outlined,
-                                  size: 14,
-                                  color: Colors.white70,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  DateFormat.yMMMd().add_jm().format(entry.createdAt),
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                child: JournalCard(
+                  entry: entry,
+                  isExpanded: isExpanded,
+                  onTap: () => setState(() {
+                    if (isExpanded) {
+                      _expandedEntries.remove(entry.id);
+                    } else {
+                      // Clear all other expanded entries first
+                      _expandedEntries.clear();
+                      // Then expand the current entry
+                      _expandedEntries.add(entry.id);
+                    }
+                  }),
                 ),
               );
             },
@@ -337,6 +287,102 @@ class _JournalScreenState extends State<JournalScreen> {
             await _loadEntries();
           }
         },
+      ),
+    );
+  }
+}
+
+class JournalCard extends StatefulWidget {
+  final JournalEntry entry;
+  final bool isExpanded;
+  final VoidCallback onTap;
+
+  const JournalCard({
+    super.key,
+    required this.entry,
+    required this.isExpanded,
+    required this.onTap,
+  });
+
+  @override
+  State<JournalCard> createState() => _JournalCardState();
+}
+
+class _JournalCardState extends State<JournalCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Create preview text (always visible)
+    final contentPreview = widget.entry.content.length > 150
+        ? '${widget.entry.content.substring(0, 150)}...'
+        : widget.entry.content;
+
+    // Create additional content (only shown when expanded)
+    final additionalContent = widget.entry.content.length > 150
+        ? widget.entry.content.substring(150)
+        : '';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6.0),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          transform: _isHovered ? Matrix4.translationValues(0, -5, 0) : Matrix4.identity(),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(12.0),
+            border: Border.all(
+              color: widget.isExpanded ? Theme.of(context).primaryColor : Colors.white12,
+              width: widget.isExpanded ? 2.0 : 0.5,
+            ),
+          ),
+          child: InkWell(
+            onTap: widget.onTap,
+            hoverColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(12.0),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Simple animated text content
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      height: 1.5,
+                    ) ?? const TextStyle(),
+                    child: Text(
+                      widget.isExpanded ? widget.entry.content : contentPreview,
+                      maxLines: widget.isExpanded ? null : 3,
+                      overflow: widget.isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 14,
+                        color: Colors.white70,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        DateFormat.yMMMd().add_jm().format(widget.entry.createdAt),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

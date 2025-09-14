@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/models.dart';
 import 'star_rating.dart';
 import 'animated_widgets.dart';
@@ -20,18 +21,23 @@ class CompletionDetailsDialog extends StatefulWidget {
 
 class _CompletionDetailsDialogState extends State<CompletionDetailsDialog> {
   late TextEditingController _descriptionController;
+  late TextEditingController _actualHoursController;
   int _rating = 0;
 
   @override
   void initState() {
     super.initState();
     _descriptionController = TextEditingController(text: widget.task.completionDescription ?? '');
+    // Use saved actualHours if available, otherwise use plannedHours as default
+    final initialHours = widget.task.actualHours ?? widget.task.plannedHours;
+    _actualHoursController = TextEditingController(text: initialHours.toString());
     _rating = widget.task.rating ?? 0;
   }
 
   @override
   void dispose() {
     _descriptionController.dispose();
+    _actualHoursController.dispose();
     super.dispose();
   }
 
@@ -151,6 +157,44 @@ class _CompletionDetailsDialogState extends State<CompletionDetailsDialog> {
                 ),
                 const SizedBox(height: 24),
 
+                // Actual Hours section
+                Text(
+                  'Actual Hours Worked:',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _actualHoursController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    hintText: 'Enter actual hours worked...',
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                      fontFamily: 'Inter',
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFF2A2A2A),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixText: 'hours',
+                    suffixStyle: TextStyle(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  style: TextStyle(color: colorScheme.onSurface, fontFamily: 'Inter'),
+                  inputFormatters: [
+                    // Allow only numbers and decimal point
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
                 // Rating section
                 Text(
                   'Rate your performance:',
@@ -194,6 +238,21 @@ class _CompletionDetailsDialogState extends State<CompletionDetailsDialog> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
+                          // Parse actual hours
+                          double? actualHours;
+                          if (_actualHoursController.text.trim().isNotEmpty) {
+                            actualHours = double.tryParse(_actualHoursController.text.trim());
+                            if (actualHours == null || actualHours < 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please enter a valid number for actual hours'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              return;
+                            }
+                          }
+
                           final updatedTask = Task(
                             id: widget.task.id,
                             title: widget.task.title,
@@ -205,6 +264,7 @@ class _CompletionDetailsDialogState extends State<CompletionDetailsDialog> {
                                 ? null
                                 : _descriptionController.text.trim(),
                             rating: _rating == 0 ? null : _rating,
+                            actualHours: actualHours,
                           );
                           widget.onSave(updatedTask);
                           Navigator.of(context).pop();

@@ -106,23 +106,41 @@ class _ToDoScreenState extends State<ToDoScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Row containing task title Text, timestamp, and edit Icon
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              task.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'League Spartan',
-                                decoration: task.isDone ? TextDecoration.lineThrough : TextDecoration.none,
-                                color: task.isDone
-                                    ? Theme.of(context).textTheme.bodySmall?.color
-                                    : Theme.of(context).textTheme.titleMedium?.color,
-                              ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    task.title,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'League Spartan',
+                                      decoration: task.isDone ? TextDecoration.lineThrough : TextDecoration.none,
+                                      color: task.isDone
+                                          ? Theme.of(context).textTheme.bodySmall?.color
+                                          : Theme.of(context).textTheme.titleMedium?.color,
+                                    ),
+                                  ),
+                                ),
+                                // Completion timestamp inline with task title
+                                if (task.isDone && task.completedAt != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8.0),
+                                    child: Text(
+                                      '${task.completedAt!.hour}:${task.completedAt!.minute.toString().padLeft(2, '0')}',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
                           if (!showCompleted)
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 20),
@@ -148,64 +166,115 @@ class _ToDoScreenState extends State<ToDoScreen> {
                             ),
                         ],
                       ),
+
+                      // SizedBox for vertical spacing
+                      const SizedBox(height: 4),
+
+                      // Due time (if exists)
                       if (task.dueTime != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.alarm,
-                                size: 16,
-                                color: Theme.of(context).textTheme.bodySmall?.color,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                task.dueTime!.format(context),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.alarm,
+                              size: 16,
+                              color: Theme.of(context).textTheme.bodySmall?.color,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              task.dueTime!.format(context),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ),
-                      if (task.plannedHours > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            'Planned: ${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+
+                      // SizedBox for spacing
+                      if (task.dueTime != null)
+                        const SizedBox(height: 4),
+
+                      // Row containing the metadata (Planned, Worked, Rating)
+                      if (task.isDone && (task.plannedHours > 0 || (task.actualHours != null && task.actualHours! > 0) || task.rating != null))
+                        Row(
+                          children: [
+                            // Planned hours
+                            if (task.plannedHours > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surface.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Planned: ${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            // Worked hours (if different from planned)
+                            if (task.isDone && task.actualHours != null && task.actualHours! > 0 && task.actualHours != task.plannedHours)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4.0), // Reduced from 6.0 to 4.0 (2px left)
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Worked: ${task.actualHours! % 1 == 0 ? task.actualHours!.toInt() : task.actualHours!.toStringAsFixed(1)}h',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            // Small spacer to position stars closer to hours
+                            const SizedBox(width: 16),
+                            // Performance rating stars
+                            if (task.rating != null)
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.star,
+                                    size: 16,
+                                    color: Colors.amber,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${task.rating}/5',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.amber,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
+
+                      // SizedBox for spacing
+                      if (task.isDone && (task.plannedHours > 0 || (task.actualHours != null && task.actualHours! > 0) || task.rating != null))
+                        const SizedBox(height: 5),
+
+                      // Text widget for task description
                       if (task.isDone && task.completionDescription?.isNotEmpty == true)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
+                        Container(
+                          padding: const EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surface.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
                           child: Text(
                             task.completionDescription!,
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context).textTheme.bodySmall?.color,
                               fontStyle: FontStyle.italic,
+                              height: 1.4,
                             ),
                           ),
                         ),
-                      if (task.isDone && task.rating != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.star,
-                                size: 16,
-                                color: Colors.amber,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${task.rating}/5',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.amber,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+
                     ],
                   ),
                 ),

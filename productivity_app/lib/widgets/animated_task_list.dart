@@ -74,16 +74,33 @@ class _AnimatedTaskListState extends State<AnimatedTaskList> with AutomaticKeepA
                                     Row(
                                       children: [
                                         Expanded(
-                                          child: AnimatedDefaultTextStyle(
-                                            duration: const Duration(milliseconds: 300),
-                                            style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  decoration: task.isDone ? TextDecoration.lineThrough : TextDecoration.none,
-                                                  color: task.isDone
-                                                      ? Theme.of(context).textTheme.bodySmall?.color
-                                                      : Theme.of(context).textTheme.titleMedium?.color,
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: AnimatedDefaultTextStyle(
+                                                  duration: const Duration(milliseconds: 300),
+                                                  style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                                                        fontWeight: FontWeight.bold,
+                                                        decoration: task.isDone ? TextDecoration.lineThrough : TextDecoration.none,
+                                                        color: task.isDone
+                                                            ? Theme.of(context).textTheme.bodySmall?.color
+                                                            : Theme.of(context).textTheme.titleMedium?.color,
+                                                      ),
+                                                  child: Text(task.title),
                                                 ),
-                                            child: Text(task.title),
+                                              ),
+                                              if (task.isDone && task.completedAt != null)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(left: 8.0),
+                                                  child: Text(
+                                                    '${task.completedAt!.hour}:${task.completedAt!.minute.toString().padLeft(2, '0')}',
+                                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -130,12 +147,45 @@ class _AnimatedTaskListState extends State<AnimatedTaskList> with AutomaticKeepA
                                           ],
                                         ),
                                       ),
-                                    if (task.plannedHours > 0)
+                                    if (task.isDone && task.actualHours != null && task.actualHours! > 0)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4.0),
-                                        child: Text(
-                                          'Planned: ${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h',
-                                          style: Theme.of(context).textTheme.bodySmall,
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              'Actual: ',
+                                              style: Theme.of(context).textTheme.bodySmall,
+                                            ),
+                                            SizedBox(
+                                              width: 40, // Fixed width for consistent alignment
+                                              child: Text(
+                                                '${task.actualHours! % 1 == 0 ? task.actualHours!.toInt() : task.actualHours!.toStringAsFixed(1)}h',
+                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Theme.of(context).colorScheme.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    else if (task.plannedHours > 0)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              'Planned: ',
+                                              style: Theme.of(context).textTheme.bodySmall,
+                                            ),
+                                            SizedBox(
+                                              width: 40, // Fixed width for consistent alignment
+                                              child: Text(
+                                                '${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h',
+                                                style: Theme.of(context).textTheme.bodySmall,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     if (task.isDone && task.completionDescription?.isNotEmpty == true)

@@ -106,12 +106,13 @@ class TaskProvider extends ChangeNotifier {
           completionDescription: task.completionDescription,
           rating: task.rating,
           actualHours: task.actualHours,
+          completedAt: isCompleted ? DateTime.now() : null,
         );
-        
+
         // Update in-memory list immediately
         _todayTasks[index] = updatedTask;
         notifyListeners();
-        
+
         // Persist to disk
         await StorageService.updateTask(updatedTask);
       }

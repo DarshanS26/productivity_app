@@ -35,6 +35,9 @@ class Task extends HiveObject {
   @HiveField(8)
   double? actualHours;
 
+  @HiveField(9)
+  DateTime? completedAt;
+
   Task({
     required this.id,
     required this.title,
@@ -45,6 +48,7 @@ class Task extends HiveObject {
     this.completionDescription,
     this.rating,
     this.actualHours,
+    this.completedAt,
   });
 
   // JSON serialization
@@ -64,6 +68,7 @@ class Task extends HiveObject {
       completionDescription: json['completionDescription'] as String?,
       rating: json['rating'] as int?,
       actualHours: json['actualHours'] != null ? (json['actualHours'] as num).toDouble() : null,
+      completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt'] as String) : null,
     );
   }
 
@@ -78,6 +83,7 @@ class Task extends HiveObject {
       'completionDescription': completionDescription,
       'rating': rating,
       'actualHours': actualHours,
+      'completedAt': completedAt?.toIso8601String(),
     };
   }
 }

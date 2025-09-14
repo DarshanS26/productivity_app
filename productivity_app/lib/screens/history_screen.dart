@@ -61,6 +61,8 @@ class HistoryScreenState extends State<HistoryScreen> with WidgetsBindingObserve
           _availableDates = dates;
           _isLoading = false;
         });
+        // Auto-expand the current week after loading
+        _autoExpandCurrentWeek();
       }
     } catch (e) {
       print('HistoryScreen: Failed to load history dates: $e');
@@ -78,7 +80,28 @@ class HistoryScreenState extends State<HistoryScreen> with WidgetsBindingObserve
     final provider = Provider.of<TaskProvider>(context, listen: false);
     await provider.refreshTodayTasks();
     await _initialize();
+    // Re-auto-expand the current week after refresh
+    _autoExpandCurrentWeek();
     print('HistoryScreen: History refresh completed');
+  }
+
+  void _autoExpandCurrentWeek() {
+    if (_availableDates.isEmpty) return;
+
+    // Group dates by weeks to find the current week
+    final weeks = _groupDatesByWeeks(_availableDates);
+    if (weeks.isEmpty) return;
+
+    // The first week in the list is the most recent (already sorted by most recent first)
+    final currentWeek = weeks.first;
+    final currentWeekKey = currentWeek['weekKey'] as String;
+
+    // Auto-expand the current week
+    setState(() {
+      _expandedWeeks.add(currentWeekKey);
+    });
+
+    print('HistoryScreen: Auto-expanded current week: $currentWeekKey');
   }
 
   // Load custom week name from storage
@@ -397,8 +420,9 @@ class _WeekCardState extends State<_WeekCard> {
 
   // Calculate week statistics
   Future<Map<String, dynamic>> _calculateWeekStats() async {
-    double totalHours = 0.0; // Sum of all planned hours (completed + incomplete)
-    double completedHours = 0.0; // Sum of planned hours for completed tasks
+    double totalPlannedHours = 0.0; // Sum of all plannedHours for tasks in the week
+    double completedPlannedHours = 0.0; // Sum of plannedHours for tasks marked completed
+    double completedActualHours = 0.0; // Sum of actualHours for tasks marked completed
     int currentStreak = 0;
     int maxStreak = 0;
     double bestDayHours = 0.0;
@@ -413,22 +437,28 @@ class _WeekCardState extends State<_WeekCard> {
         final provider = Provider.of<TaskProvider>(context, listen: false);
         final dayTasks = await provider.loadTasksForDate(day);
 
-        // Calculate all planned hours and completed hours
-        final allPlanned = dayTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
+        // Calculate statistics
         final completedTasks = dayTasks.where((t) => t.isDone).toList();
-        final completedPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
 
-        totalHours += allPlanned;
-        completedHours += completedPlanned;
+        // Total Planned Hours: sum of all plannedHours for tasks in the week
+        totalPlannedHours += dayTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
 
-        // Update best day (based on completed hours)
-        if (completedPlanned > bestDayHours) {
-          bestDayHours = completedPlanned;
+        // Completed Planned Hours: sum of plannedHours for tasks marked completed
+        completedPlannedHours += completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
+
+        // Completed Actual Hours: sum of actualHours for tasks marked completed
+        completedActualHours += completedTasks.fold(0.0, (sum, task) => sum + (task.actualHours ?? task.plannedHours));
+
+
+        // Update best day (based on completed actual hours for this day)
+        final dayCompletedActual = completedTasks.fold(0.0, (sum, task) => sum + (task.actualHours ?? task.plannedHours));
+        if (dayCompletedActual > bestDayHours) {
+          bestDayHours = dayCompletedActual;
           bestDay = day;
         }
 
         // Update streak (consecutive days with completed tasks)
-        if (completedPlanned > 0) {
+        if (completedTasks.isNotEmpty) {
           currentStreak++;
           if (currentStreak > maxStreak) {
             maxStreak = currentStreak;
@@ -443,8 +473,9 @@ class _WeekCardState extends State<_WeekCard> {
     }
 
     return {
-      'totalHours': totalHours,
-      'completedHours': completedHours,
+      'totalPlannedHours': totalPlannedHours,
+      'completedPlannedHours': completedPlannedHours,
+      'completedActualHours': completedActualHours,
       'streak': maxStreak,
       'bestDay': bestDay,
       'bestDayHours': bestDayHours,
@@ -778,7 +809,7 @@ class _WeekCardState extends State<_WeekCard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Total hours
+                            // Total Planned Hours
                             Row(
                               children: [
                                 Icon(
@@ -788,7 +819,7 @@ class _WeekCardState extends State<_WeekCard> {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Total Hours: ${(stats['totalHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
+                                  'Total Planned Hours: ${(stats['totalPlannedHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.normal,
                                   ),
@@ -797,7 +828,26 @@ class _WeekCardState extends State<_WeekCard> {
                             ),
                             const SizedBox(height: 4),
 
-                            // Completed hours
+                            // Completed Planned Hours
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.assignment_turned_in,
+                                  size: 20,
+                                  color: Colors.blue,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Completed Planned Hours: ${(stats['completedPlannedHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+
+                            // Completed Actual Hours
                             Row(
                               children: [
                                 Icon(
@@ -807,7 +857,7 @@ class _WeekCardState extends State<_WeekCard> {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Completed Hours: ${(stats['completedHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
+                                  'Completed Actual Hours: ${(stats['completedActualHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.normal,
                                   ),
@@ -815,6 +865,7 @@ class _WeekCardState extends State<_WeekCard> {
                               ],
                             ),
                             const SizedBox(height: 4),
+
 
                             // Streak
                             Row(
@@ -1148,7 +1199,7 @@ class _HistoryCardState extends State<_HistoryCard> {
   // Helper method to build the actual card UI to avoid code duplication
   Widget _buildCardContent(List<Task> tasks) {
     final completedTasks = tasks.where((t) => t.isDone).toList();
-    final totalPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
+    final totalActual = completedTasks.fold(0.0, (sum, task) => sum + (task.actualHours ?? task.plannedHours));
 
     return AppCard(
       padding: const EdgeInsets.all(6.0),
@@ -1157,8 +1208,8 @@ class _HistoryCardState extends State<_HistoryCard> {
         children: [
           _buildCardHeader(
             tasks: tasks,
-            totalPlanned: totalPlanned,
-            totalHours: totalPlanned,
+            totalPlanned: totalActual,
+            totalHours: totalActual,
           ),
           // The animation will now work correctly!
           AnimatedSize(
@@ -1203,6 +1254,10 @@ class _HistoryCardState extends State<_HistoryCard> {
         ? tasks.where((t) => t.isDone).length
         : tasks.where((t) => t.isDone).length;
 
+    // Calculate total planned hours for completed tasks
+    final completedTasks = tasks.where((t) => t.isDone).toList();
+    final totalPlannedForCompleted = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
+
     return GestureDetector(
       onTap: () => widget.onToggleExpand(context), // Make the header area trigger expansion
       behavior: HitTestBehavior.opaque,
@@ -1219,7 +1274,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$tasksAdded tasks • $tasksCompleted completed',
+                  '$tasksAdded tasks • $tasksCompleted completed • Planned ${totalPlannedForCompleted % 1 == 0 ? totalPlannedForCompleted.toInt() : totalPlannedForCompleted.toStringAsFixed(1)}h',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
@@ -1337,44 +1392,86 @@ class _TaskItem extends StatelessWidget {
                   size: 20,
                 ),
                 const SizedBox(width: 12),
+                // Task title (left side)
                 Expanded(
                   child: Text(
                     task.title,
                     style: const TextStyle(fontSize: 14, fontFamily: 'Roboto'),
                   ),
                 ),
-                // Blue dot indicator for tasks with notes
-                if (task.completionDescription?.isNotEmpty == true)
-                  Container(
-                    width: 6,
-                    height: 6,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: const BoxDecoration(
-                      color: Colors.blue,
-                      shape: BoxShape.circle,
+                // Metadata columns (right side)
+                Row(
+                  children: [
+                    // Column 1: Completion timestamp
+                    SizedBox(
+                      width: 45, // Fixed width for timestamp column
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: task.isDone && task.completedAt != null
+                            ? Text(
+                                '${task.completedAt!.hour}:${task.completedAt!.minute.toString().padLeft(2, '0')}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                                  fontSize: 11,
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                     ),
-                  ),
-
-                // Hours text with consistent spacing
-                if (task.plannedHours > 0)
-                  Text(
-                    '${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)} h',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-
-                // Consistent spacing for alignment (whether arrow exists or not)
-                const SizedBox(width: 8),
-
-                // Only show arrow if there are notes or rating
-                if (task.completionDescription?.isNotEmpty == true || task.rating != null)
-                  Icon(
-                    isExpanded ? Icons.expand_less : Icons.expand_more,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                  )
-                else
-                  // Invisible placeholder to maintain alignment
-                  const SizedBox(width: 20, height: 20),
+                    // Column 2: Hours
+                    SizedBox(
+                      width: 50, // Fixed width for hours column
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: task.actualHours != null && task.actualHours! > 0
+                            ? Text(
+                                '${task.actualHours! % 1 == 0 ? task.actualHours!.toInt() : task.actualHours!.toStringAsFixed(1)}h',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              )
+                            : task.plannedHours > 0
+                                ? Text(
+                                    '${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  )
+                                : const SizedBox.shrink(),
+                      ),
+                    ),
+                    // Column 3: Note indicator (blue dot) - adjusted spacing
+                    SizedBox(
+                      width: 25, // Increased width for better spacing from hours
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: task.completionDescription?.isNotEmpty == true
+                            ? Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Colors.blue,
+                                  shape: BoxShape.circle,
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                    // Column 4: Expansion arrow
+                    SizedBox(
+                      width: 30, // Fixed width for arrow column
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: task.completionDescription?.isNotEmpty == true || task.rating != null
+                            ? Icon(
+                                isExpanded ? Icons.expand_less : Icons.expand_more,
+                                size: 20,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1412,20 +1509,42 @@ class _TaskItem extends StatelessWidget {
 
                 // Performance rating
                 if (task.rating != null)
-                  Row(
-                    children: [
-                      Text(
-                        'Performance: ',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Performance: ',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          ),
                         ),
-                      ),
-                      StarRatingDisplay(
-                        rating: task.rating!,
-                        size: 14,
-                      ),
-                    ],
+                        StarRatingDisplay(
+                          rating: task.rating!,
+                          size: 14,
+                        ),
+                      ],
+                    ),
                   ),
+
+                // Actual vs Planned Hours
+                Row(
+                  children: [
+                    Text(
+                      'Actual vs Planned Hours: ',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                    Text(
+                      'Actual: ${task.actualHours != null ? (task.actualHours! % 1 == 0 ? task.actualHours!.toInt() : task.actualHours!.toStringAsFixed(1)) : '0.0'}h (Planned: ${task.plannedHours % 1 == 0 ? task.plannedHours.toInt() : task.plannedHours.toStringAsFixed(1)}h)',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ) : const SizedBox.shrink(),
