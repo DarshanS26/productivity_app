@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart'; // NEW: For TaskProvider
@@ -20,9 +21,9 @@ class _ToDoScreenState extends State<ToDoScreen> {
   final _scrollController2 = ScrollController();
   bool _isLoading = true;
   // ignore: unused_field
-  List<Task> _tasks = [];
+  final List<Task> _tasks = [];
   // ignore: unused_field
-  DateTime _currentDate = DateTime.now();
+  final DateTime _currentDate = DateTime.now();
 
   @override
   void initState() {
@@ -35,7 +36,7 @@ class _ToDoScreenState extends State<ToDoScreen> {
       // Load today's tasks into the provider
       final provider = Provider.of<TaskProvider>(context, listen: false);
       await provider.loadTodayTasks();
-      
+
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -113,6 +114,7 @@ class _ToDoScreenState extends State<ToDoScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                fontFamily: 'League Spartan',
                                 decoration: task.isDone ? TextDecoration.lineThrough : TextDecoration.none,
                                 color: task.isDone
                                     ? Theme.of(context).textTheme.bodySmall?.color
@@ -238,116 +240,134 @@ class _ToDoScreenState extends State<ToDoScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Add Task'),
-              content: Container(
-                width: 500, // Make dialog wider
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: taskController,
-                      decoration: InputDecoration(
-                        hintText: "Enter task title",
-                        hintStyle: TextStyle(
-                          color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
-                          fontSize: 14,
-                          fontFamily: 'Courier New', // Tech-like font
-                        ),
-                        contentPadding: const EdgeInsets.only(bottom: 12, top: 8),
-                      ),
-                      autofocus: true,
-                      style: const TextStyle(),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: hoursController,
-                      decoration: InputDecoration(
-                        hintText: "Planned Hours (e.g., 1.5, 2.25)",
-                        hintStyle: TextStyle(
-                          color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
-                          fontSize: 14,
-                          fontFamily: 'Courier New', // Tech-like font
-                        ),
-                        contentPadding: const EdgeInsets.only(bottom: 12, top: 8),
-                      ),
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: <TextInputFormatter>[
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                      ],
-                      style: const TextStyle(),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        TextButton.icon(
-                          icon: const Icon(Icons.alarm_add),
-                          label: Text(selectedTime?.format(context) ?? 'Add due time'),
-                          onPressed: () async {
-                            final time = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              setState(() {
-                                selectedTime = time;
-                              });
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+        return BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24.0),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                title: const Text('Add Task'),
+                content: SizedBox(
+                  width: 500, // Make dialog wider
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: taskController,
+                        decoration: InputDecoration(
+                          hintText: "Enter task title",
+                          hintStyle: TextStyle(
+                            color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFF2A2A2A),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                        ),
+                        autofocus: true,
+                        style: const TextStyle(fontFamily: 'Inter'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: hoursController,
+                        decoration: InputDecoration(
+                          hintText: "Planned Hours",
+                          hintStyle: TextStyle(
+                            color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFF2A2A2A),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                        ),
+                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: <TextInputFormatter>[
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                        ],
+                        style: const TextStyle(fontFamily: 'Inter'),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          TextButton.icon(
+                            icon: const Icon(Icons.alarm_add),
+                            label: Text(selectedTime?.format(context) ?? 'Add due time'),
+                            onPressed: () async {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (time != null) {
+                                setState(() {
+                                  selectedTime = time;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                TextButton(
-                  onPressed: () async {
-                    final String title = taskController.text.trim();
-                    final String hoursText = hoursController.text.trim();
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final String title = taskController.text.trim();
+                      final String hoursText = hoursController.text.trim();
 
-                    if (title.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a task title')),
-                      );
-                      return;
-                    }
-
-                    double plannedHours = 0.0;
-                    if (hoursText.isNotEmpty) {
-                      plannedHours = double.tryParse(hoursText) ?? -1.0;
-                      if (plannedHours < 0) {
+                      if (title.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter a valid positive number for hours')),
+                          const SnackBar(content: Text('Please enter a task title')),
                         );
                         return;
                       }
-                    }
 
-                    final newTask = Task(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      title: title,
-                      createdAt: DateTime.now(),
-                      dueTime: selectedTime,
-                      plannedHours: plannedHours,
-                    );
-                    final provider = Provider.of<TaskProvider>(context, listen: false);
-                    await provider.addTask(newTask);
-                    print('Task added, calling callback');
-                    widget.onTasksUpdated?.call();
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Add'),
-                ),
-              ],
-            );
-          },
+                      double plannedHours = 0.0;
+                      if (hoursText.isNotEmpty) {
+                        plannedHours = double.tryParse(hoursText) ?? -1.0;
+                        if (plannedHours < 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter a valid positive number for hours')),
+                          );
+                          return;
+                        }
+                      }
+
+                      final newTask = Task(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        title: title,
+                        createdAt: DateTime.now(),
+                        dueTime: selectedTime,
+                        plannedHours: plannedHours,
+                      );
+                      final provider = Provider.of<TaskProvider>(context, listen: false);
+                      await provider.addTask(newTask);
+                      print('Task added, calling callback');
+                      widget.onTasksUpdated?.call();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Add'),
+                  ),
+                ],
+              );
+            },
+          ),
         );
       },
     );
@@ -450,5 +470,3 @@ class _ToDoScreenState extends State<ToDoScreen> {
     );
   }
 }
-
-

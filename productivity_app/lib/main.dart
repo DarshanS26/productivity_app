@@ -1,9 +1,13 @@
 import 'dart:async';
+//import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart'; // NEW: For state management
+//import 'package:shared_preferences/shared_preferences.dart';
+//import 'package:window_manager/window_manager.dart';
 import 'task_provider.dart'; // NEW: Import TaskProvider
 import 'services/storage_service.dart';
+import 'services/window_state_manager.dart';
 import 'screens/todo_screen.dart';
 import 'screens/journal_screen.dart';
 import 'screens/history_screen.dart';
@@ -12,6 +16,9 @@ void main() async {
   print('Starting Productivity App...');
   WidgetsFlutterBinding.ensureInitialized();
   print('WidgetsFlutterBinding initialized');
+
+  // Initialize window state manager (handles all window setup and restoration)
+  await WindowStateManager.initialize();
 
   // Initialize new storage service
   try {
@@ -42,21 +49,44 @@ void main() async {
   );
 }
 
-class ProductivityApp extends StatelessWidget {
+class ProductivityApp extends StatefulWidget {
   const ProductivityApp({super.key});
 
   @override
+  State<ProductivityApp> createState() => _ProductivityAppState();
+}
+
+class _ProductivityAppState extends State<ProductivityApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Start listening for window state changes
+    WindowStateManager.startListening();
+  }
+
+  @override
+  void dispose() {
+    // Stop listening for window state changes
+    WindowStateManager.stopListening();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const Color primaryColor = Color(0xFF569CD6);
-    const Color scaffoldBackgroundColor = Color(0xFF1E1E1E);
-    const Color cardColor = Color(0xFF252526);
+    const Color primaryColor = Color(0xFF4A90E2); // Modern vibrant blue
+    const Color scaffoldBackgroundColor = Color(0xFF121212); // Very dark grey
+    const Color cardColor = Color(0xFF1E1E1E); // Slightly lighter grey for depth
+    const Color errorColor = Color(0xFFE57373); // Softer red for destructive actions
+    // ignore: unused_local_variable
     const Color mutedTextColor = Color(0xFF858585);
+    // ignore: unused_local_variable
     final TextTheme originalTextTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme);
 
     return MaterialApp(
       title: 'Productivity App',
       theme: ThemeData(
         brightness: Brightness.dark,
+        fontFamily: null, // Use system default font family
         primaryColor: primaryColor,
         scaffoldBackgroundColor: scaffoldBackgroundColor,
         cardColor: cardColor,
@@ -65,30 +95,48 @@ class ProductivityApp extends StatelessWidget {
           secondary: primaryColor,
           surface: cardColor,
           surfaceTint: cardColor,
+          error: errorColor,
           onSurface: Colors.white,
         ),
         appBarTheme: AppBarTheme(
           backgroundColor: scaffoldBackgroundColor,
           elevation: 0,
-          titleTextStyle: GoogleFonts.inter(
-            color: primaryColor,
+          titleTextStyle: const TextStyle(
+            color: Color(0xFF4A90E2),
             fontWeight: FontWeight.bold,
             fontSize: 20,
+            fontFamily: 'Inter',
           ),
         ),
-        textTheme: originalTextTheme.copyWith(
-          headlineLarge: originalTextTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold),
-          headlineMedium: originalTextTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          headlineSmall: originalTextTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          titleLarge: originalTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          titleMedium: originalTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          titleSmall: originalTextTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-          bodyLarge: originalTextTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
-          bodyMedium: originalTextTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-          bodySmall: originalTextTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500, color: mutedTextColor),
-          labelLarge: originalTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
-          labelMedium: originalTextTheme.labelMedium?.copyWith(fontWeight: FontWeight.w500),
-          labelSmall: originalTextTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500, color: mutedTextColor),
+        textTheme: const TextTheme(
+          // Screen Titles
+          displayLarge: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
+          ),
+          // Card Titles
+          titleLarge: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            fontFamily: null,
+          ),
+          // Body Text
+          bodyMedium: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.normal,
+            fontFamily: null,
+          ),
+          // Metadata/Captions
+          bodySmall: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.normal,
+            color: Color(0xB3FFFFFF), // Colors.white70
+            fontFamily: null,
+          ),
+        ).apply(
+          displayColor: Colors.white,
+          bodyColor: Colors.white,
         ),
         cardTheme: CardThemeData(
           elevation: 4.0,
@@ -208,6 +256,11 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Productivity App'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
+      ),
       body: IndexedStack(
         index: _selectedIndex,
         children: _widgetOptions,

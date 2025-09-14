@@ -54,7 +54,7 @@ class StorageService {
         print('StorageService: Stack trace: $stackTrace');
 
         // Fallback to a local directory in the app's working directory
-        final fallbackDir = '$_appFolderName';
+        final fallbackDir = _appFolderName;
         print('StorageService: Using fallback directory: $fallbackDir');
         final dir = Directory(fallbackDir);
         if (!await dir.exists()) {
@@ -164,7 +164,7 @@ class StorageService {
         // Web implementation using SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         final tasksJson = prefs.getString('tasks_${_getDateString(date)}');
-        print('Web: tasks JSON for ${date}: ${tasksJson != null ? 'found' : 'not found'}');
+        print('Web: tasks JSON for $date: ${tasksJson != null ? 'found' : 'not found'}');
 
         if (tasksJson == null) return [];
 
@@ -177,24 +177,24 @@ class StorageService {
             .toList();
 
         final allTasks = [...pendingTasks, ...completedTasks];
-        print('Web: loaded ${allTasks.length} tasks for ${date}');
+        print('Web: loaded ${allTasks.length} tasks for $date');
         return allTasks;
       } else {
         // Desktop implementation using files
         final file = File(filePath);
         final exists = await file.exists();
-        print('Desktop: file exists for ${date}: $exists');
+        print('Desktop: file exists for $date: $exists');
 
         if (!exists) {
-          print('Desktop: no file found for ${date}, returning empty list');
+          print('Desktop: no file found for $date, returning empty list');
           return [];
         }
 
         final content = await file.readAsString();
-        print('Desktop: read content for ${date}, length: ${content.length}');
+        print('Desktop: read content for $date, length: ${content.length}');
 
         final tasksData = json.decode(content) as Map<String, dynamic>;
-        print('Desktop: decoded JSON for ${date}');
+        print('Desktop: decoded JSON for $date');
 
         final pendingTasks = (tasksData['pending'] as List<dynamic>? ?? [])
             .map((task) => Task.fromJson(task))
@@ -204,11 +204,11 @@ class StorageService {
             .toList();
 
         final allTasks = [...pendingTasks, ...completedTasks];
-        print('Desktop: loaded ${allTasks.length} tasks for ${date} (${pendingTasks.length} pending, ${completedTasks.length} completed)');
+        print('Desktop: loaded ${allTasks.length} tasks for $date (${pendingTasks.length} pending, ${completedTasks.length} completed)');
         return allTasks;
       }
     } catch (e) {
-      print('Error loading tasks for ${date}: $e');
+      print('Error loading tasks for $date: $e');
       print('Stack trace: ${StackTrace.current}');
       return [];
     }
@@ -241,7 +241,7 @@ class StorageService {
 
       _emitTaskUpdate(date: date, tasks: tasks); // NEW: Emit after successful save
     } catch (e) {
-      print('Error saving tasks for ${date}: $e');
+      print('Error saving tasks for $date: $e');
       rethrow;
     }
   }
@@ -330,7 +330,7 @@ class StorageService {
         await file.writeAsString(jsonString);
       }
     } catch (e) {
-      print('Error saving journals for ${date}: $e');
+      print('Error saving journals for $date: $e');
       rethrow;
     }
   }

@@ -1,8 +1,9 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
-import '../widgets/app_card.dart';
+//import '../widgets/app_card.dart';
 
 class JournalScreen extends StatefulWidget {
   const JournalScreen({super.key});
@@ -17,6 +18,8 @@ class _JournalScreenState extends State<JournalScreen> {
   List<JournalEntry> _entries = [];
   // ignore: unused_field
   List<DateTime> _availableDates = [];
+  // ignore: unused_field
+  String? _hoveredEntryId;
 
   @override
   void initState() {
@@ -54,7 +57,7 @@ class _JournalScreenState extends State<JournalScreen> {
       for (final date in availableDates) {
         final entries = await StorageService.loadJournalsForDate(date);
         allEntries.addAll(entries);
-        print('JournalScreen: Loaded ${entries.length} entries for ${date}');
+        print('JournalScreen: Loaded ${entries.length} entries for $date');
       }
 
       // Sort entries by creation date (newest first)
@@ -90,14 +93,14 @@ class _JournalScreenState extends State<JournalScreen> {
       final date = now.subtract(Duration(days: i));
       try {
         final entries = await StorageService.loadJournalsForDate(date);
-        print('JournalScreen: Checked date ${date}: ${entries.length} entries');
+        print('JournalScreen: Checked date $date: ${entries.length} entries');
         if (entries.isNotEmpty) {
           datesWithJournals.add(date);
-          print('JournalScreen: Found journal entries for ${date}');
+          print('JournalScreen: Found journal entries for $date');
         }
       } catch (e) {
         // Skip dates with errors
-        print('JournalScreen: Error checking date ${date}: $e');
+        print('JournalScreen: Error checking date $date: $e');
       }
     }
 
@@ -121,11 +124,24 @@ class _JournalScreenState extends State<JournalScreen> {
       ),
       body: _entries.isEmpty
           ? Center(
-              child: Text(
-                "No journal entries yet.",
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                    ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.note_alt_outlined,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Your thoughts will appear here.\nTap the '+' to begin.",
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                          height: 1.5,
+                        ),
+                  ),
+                ],
               ),
             )
           : ListView.builder(
@@ -163,27 +179,33 @@ class _JournalScreenState extends State<JournalScreen> {
                     // Delete
                     return await showDialog<bool>(
                       context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Delete Entry?'),
-                        content: const Text(
-                          'Are you sure you want to delete this journal entry?',
+                      builder: (context) => BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+                        child: AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24.0),
+                          ),
+                          title: const Text('Delete Entry?'),
+                          content: const Text(
+                            'Are you sure you want to delete this journal entry?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(color: colorScheme.primary),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: Text(
+                                'Delete',
+                                style: TextStyle(color: colorScheme.error),
+                              ),
+                            ),
+                          ],
                         ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: Text(
-                              'Cancel',
-                              style: TextStyle(color: colorScheme.primary),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: Text(
-                              'Delete',
-                              style: TextStyle(color: colorScheme.error),
-                            ),
-                          ),
-                        ],
                       ),
                     ) ?? false;
                   } else {
@@ -202,48 +224,61 @@ class _JournalScreenState extends State<JournalScreen> {
                     await _loadEntries();
                   }
                 },
-                child: AppCard(
-                  child: InkWell(
-                    onTap: () => setState(() {
-                      if (isExpanded) {
-                        _expandedEntries.remove(entry.id);
-                      } else {
-                        _expandedEntries.add(entry.id);
-                      }
-                    }),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isExpanded ? entry.content : contentPreview,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today,
-                                size: 16,
+                child:
+                MouseRegion(
+                  onEnter: (_) => setState(() => _hoveredEntryId = entry.id),
+                  onExit: (_) => setState(() => _hoveredEntryId = null),
+                  child: Card(
+                    margin: const EdgeInsets.symmetric(vertical: 6.0),
+                    color: const Color(0xFF1E1E1E), // Slightly lighter grey than background
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                    elevation: 0, // Flat design, no shadow
+                    child: InkWell(
+                      onTap: () => setState(() {
+                        if (isExpanded) {
+                          _expandedEntries.remove(entry.id);
+                        } else {
+                          // Clear all other expanded entries first
+                          _expandedEntries.clear();
+                          // Then expand the current entry
+                          _expandedEntries.add(entry.id);
+                        }
+                      }),
+                      borderRadius: BorderRadius.circular(12.0),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isExpanded ? entry.content : contentPreview,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                height: 1.5,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                DateFormat.yMMMd().add_jm().format(entry.createdAt),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              if (!isExpanded && entry.content.length > 150) ...[
-                                const Spacer(),
+                              maxLines: isExpanded ? null : 3,
+                              overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 14,
+                                  color: Colors.white70,
+                                ),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Tap to read more',
+                                  DateFormat.yMMMd().add_jm().format(entry.createdAt),
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.primary,
-                                      ),
+                                    color: Colors.white70,
+                                  ),
                                 ),
                               ],
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -362,171 +397,164 @@ class _JournalEntryDialogState extends State<_JournalEntryDialog> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(
-            Icons.edit_note,
-            color: colorScheme.primary,
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              widget.title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
-      contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-      content: Container(
-        width: double.maxFinite,
-        constraints: const BoxConstraints(
-          minWidth: 400,
-          maxWidth: 600,
+    return BackdropFilter(
+      filter: ui.ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.0),
         ),
-        child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            // Text input with enhanced features
-            TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              decoration: InputDecoration(
-                hintText: "What's on your mind today?\n\n• Share your thoughts and reflections\n• Note your achievements and challenges\n• Record your feelings and insights",
-                hintStyle: TextStyle(
-                  color: colorScheme.onSurface.withOpacity(0.4),
-                  fontStyle: FontStyle.italic,
-                  height: 1.5,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(
-                    color: colorScheme.outline.withOpacity(0.3),
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(
-                    color: colorScheme.outline.withOpacity(0.3),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(
-                    color: colorScheme.primary,
-                    width: 2,
-                  ),
-                ),
-                filled: true,
-                fillColor: colorScheme.surface.withOpacity(0.5),
-                contentPadding: const EdgeInsets.all(20.0),
-              ),
-              autofocus: true,
-              maxLines: 20,
-              minLines: 12,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.newline,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                height: 1.6,
-                fontSize: 16,
-              ),
-              buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _hasUnsavedChanges ? 'Unsaved changes' : 'Ready to save',
-                        style: TextStyle(
-                          color: _hasUnsavedChanges ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.6),
-                          fontSize: 12,
-                          fontWeight: _hasUnsavedChanges ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                      Text(
-                        '${currentLength} characters',
-                        style: TextStyle(
-                          color: colorScheme.onSurface.withOpacity(0.6),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            Icon(
+              Icons.edit_note,
+              color: colorScheme.primary,
+              size: 28,
             ),
-            if (_hasUnsavedChanges)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Your changes will be saved when you tap Save',
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                widget.title,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+        contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+        content: Container(
+          width: double.maxFinite,
+          constraints: const BoxConstraints(
+            minWidth: 400,
+            maxWidth: 750, // Increased for better readability
           ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Text input with enhanced features
+                TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  decoration: InputDecoration(
+                    hintText: "What's on your mind?",
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurface.withOpacity(0.4),
+                      fontStyle: FontStyle.italic,
+                      height: 1.6, // Increased line spacing
+                      fontFamily: 'Inter',
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFF2A2A2A),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(20.0),
+                  ),
+                  autofocus: true,
+                  maxLines: 20,
+                  minLines: 12,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    height: 1.6, // Increased line spacing for better readability
+                    fontSize: 16,
+                  ),
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _hasUnsavedChanges ? 'Unsaved changes' : 'Ready to save',
+                            style: TextStyle(
+                              color: _hasUnsavedChanges ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.6),
+                              fontSize: 12,
+                              fontWeight: _hasUnsavedChanges ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                          Text(
+                            '$currentLength characters',
+                            style: TextStyle(
+                              color: colorScheme.onSurface.withOpacity(0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                _hasUnsavedChanges 
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Your changes will be saved when you tap Save',
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ) 
+                    : const SizedBox.shrink(),
+              ],
+            ),
           ),
         ),
         actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
+            child: const Text('Cancel'),
           ),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final content = _controller.text.trim();
-            if (content.isNotEmpty) {
-              widget.onSave(content);
-              Navigator.of(context).pop();
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please write something before saving'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          ElevatedButton(
+            onPressed: () {
+              final content = _controller.text.trim();
+              if (content.isNotEmpty) {
+                widget.onSave(content);
+                Navigator.of(context).pop();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please write something before saving'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              backgroundColor: _hasUnsavedChanges ? colorScheme.primary : colorScheme.primary.withOpacity(0.8),
             ),
-            backgroundColor: _hasUnsavedChanges ? colorScheme.primary : colorScheme.primary.withOpacity(0.8),
+            child: Text(_hasUnsavedChanges ? 'Save Changes' : 'Save'),
           ),
-          child: Text(_hasUnsavedChanges ? 'Save Changes' : 'Save'),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

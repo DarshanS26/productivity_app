@@ -7,6 +7,7 @@ import '../task_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_card.dart';
 import '../widgets/star_rating.dart';
+//import '../widgets/animated_widgets.dart';
 
 
 class HistoryScreen extends StatefulWidget {
@@ -195,13 +196,25 @@ class HistoryScreenState extends State<HistoryScreen> with WidgetsBindingObserve
                 }
               });
             },
-            onToggleDayExpansion: (date) {
+            onToggleDayExpansion: (DateTime date, BuildContext cardContext) {
               setState(() {
                 if (_expandedDays.contains(date)) {
                   _expandedDays.remove(date);
                 } else {
                   _expandedDays.clear(); // Collapse all others
                   _expandedDays.add(date);
+                }
+              });
+
+              // Wait for the animation to complete, then ensure the item is visible.
+              Future.delayed(const Duration(milliseconds: 350), () {
+                if (mounted) {
+                  Scrollable.ensureVisible(
+                    cardContext,
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeInOut,
+                    alignment: 0.5, // Tries to center the item in the viewport
+                  );
                 }
               });
             },
@@ -221,7 +234,7 @@ class _WeekCard extends StatefulWidget {
   final bool isExpanded;
   final Set<DateTime> expandedDays;
   final VoidCallback onToggleWeekExpansion;
-  final Function(DateTime) onToggleDayExpansion;
+  final void Function(DateTime, BuildContext) onToggleDayExpansion;
   final Future<String?> Function(String) loadWeekName;
   final Future<void> Function(String, String) saveWeekName;
 
@@ -249,7 +262,7 @@ class _WeekCardState extends State<_WeekCard> {
   late ValueNotifier<bool> _isEditingNotesNotifier;
   bool _isEditing = false;
   // ignore: unused_field
-  bool _isEditingNotes = false;
+  final bool _isEditingNotes = false;
   String? _customName;
   String? _weekNotes;
   bool _showDetailedStats = false;
@@ -424,7 +437,7 @@ class _WeekCardState extends State<_WeekCard> {
           currentStreak = 0;
         }
       } catch (e) {
-        print('Error loading tasks for ${day}: $e');
+        print('Error loading tasks for $day: $e');
         // Continue with other days
       }
     }
@@ -446,7 +459,7 @@ class _WeekCardState extends State<_WeekCard> {
         color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
         borderRadius: BorderRadius.circular(12.0),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
         ),
         boxShadow: [
           BoxShadow(
@@ -459,7 +472,7 @@ class _WeekCardState extends State<_WeekCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with title and edit button
+          // Header with title and action buttons in same row
           Row(
             children: [
               Icon(
@@ -476,38 +489,13 @@ class _WeekCardState extends State<_WeekCard> {
                 ),
               ),
               const Spacer(),
-              // Hide header edit button when in edit mode (we have inline buttons)
+              // Action buttons - only show when in edit mode
               ValueListenableBuilder<bool>(
                 valueListenable: _isEditingNotesNotifier,
                 builder: (context, isEditingNotes, child) {
-                  if (isEditingNotes) return const SizedBox.shrink();
-                  return IconButton(
-                    onPressed: _toggleNotesEdit,
-                    icon: const Icon(Icons.edit, size: 18),
-                    color: Theme.of(context).colorScheme.primary,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                    tooltip: 'Edit Notes',
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Content area - Use ValueListenableBuilder for efficient rebuilds
-          ValueListenableBuilder<bool>(
-            valueListenable: _isEditingNotesNotifier,
-            builder: (context, isEditingNotes, child) {
-              return Column(
-                children: [
-                  if (isEditingNotes || _weekNotes?.isEmpty == true) ...[
-                    // Simplified action buttons - just icons, no text
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                  if (isEditingNotes) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
                           onPressed: _toggleNotesEdit,
@@ -535,8 +523,33 @@ class _WeekCardState extends State<_WeekCard> {
                           tooltip: 'Save notes',
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
+                    );
+                  } else {
+                    return IconButton(
+                      onPressed: _toggleNotesEdit,
+                      icon: const Icon(Icons.edit, size: 18),
+                      color: Theme.of(context).colorScheme.primary,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      tooltip: 'Edit Notes',
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Content area - Use ValueListenableBuilder for efficient rebuilds
+          ValueListenableBuilder<bool>(
+            valueListenable: _isEditingNotesNotifier,
+            builder: (context, isEditingNotes, child) {
+              return Column(
+                children: [
+                  if (isEditingNotes || _weekNotes?.isEmpty == true) ...[
                     // Edit mode - TextField
                     TextField(
                       controller: _notesController,
@@ -548,32 +561,18 @@ class _WeekCardState extends State<_WeekCard> {
                         hintStyle: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                           fontSize: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
+                          fontFamily: 'Inter',
                         ),
                         filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
+                        fillColor: const Color(0xFF2A2A2A),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
+                        ),
                         contentPadding: const EdgeInsets.all(12.0),
                       ),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontFamily: 'monospace', // Notepad-like font
+                        fontFamily: 'Inter',
                         fontSize: 14,
                       ),
                       onChanged: (_) {
@@ -695,18 +694,20 @@ class _WeekCardState extends State<_WeekCard> {
       final isToday = date.isAtSameMomentAs(today);
 
       return Padding(
+        key: ValueKey('day-${date.toIso8601String()}'),
         padding: const EdgeInsets.only(bottom: 8.0),
         child: _HistoryCard(
+          key: ValueKey(date),
           date: date,
           isToday: isToday,
           isExpanded: widget.expandedDays.contains(date),
-          onToggleExpand: () => widget.onToggleDayExpansion(date),
+          onToggleExpand: (cardContext) => widget.onToggleDayExpansion(date, cardContext),
         ),
       );
     }).toList();
   }
 
-  // Build week stats section
+  // Build week stats section with smooth animations
   Widget _buildWeekStatsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -721,7 +722,7 @@ class _WeekCardState extends State<_WeekCard> {
           child: Row(
             children: [
               Text(
-                _showDetailedStats ? 'Hide Detailed Stats' : 'Show Detailed Stats',
+                'Detailed Stats',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w500,
@@ -737,119 +738,132 @@ class _WeekCardState extends State<_WeekCard> {
           ),
         ),
 
-        // Detailed stats
-        if (_showDetailedStats) ...[
-          const SizedBox(height: 8),
-          FutureBuilder<Map<String, dynamic>>(
-            future: _calculateWeekStats(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+        // Animated stats content to prevent flashing
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
+          child: _showDetailedStats
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: FutureBuilder<Map<String, dynamic>>(
+                    future: _calculateWeekStats(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox(
+                          height: 40,
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
 
-              if (snapshot.hasError) {
-                return Text('Error loading stats: ${snapshot.error}');
-              }
+                      if (snapshot.hasError) {
+                        return SizedBox(
+                          height: 40,
+                          child: Text('Error loading stats: ${snapshot.error}'),
+                        );
+                      }
 
-              final stats = snapshot.data ?? {};
+                      final stats = snapshot.data ?? {};
 
-              return Container(
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12.0),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Total hours
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.schedule,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Total Hours: ${(stats['totalHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.normal,
+                      return Container(
+                        key: const ValueKey('stats_container'),
+                        padding: const EdgeInsets.all(12.0),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(12.0),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Completed hours
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.check_circle,
-                          size: 20,
-                          color: Colors.green,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Completed Hours: ${(stats['completedHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Streak
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.local_fire_department,
-                          size: 20,
-                          color: Colors.orange,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Streak: ${(stats['streak'] as int?) ?? 0} days',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Best day
-                    if (stats['bestDay'] != null) ...[
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star,
-                            size: 20,
-                            color: Colors.amber,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Best Day: ${DateFormat('EEEE').format(stats['bestDay'] as DateTime)} (${(stats['bestDayHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h)',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.normal,
-                              ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Total hours
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.schedule,
+                                  size: 20,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Total Hours: ${(stats['totalHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(height: 4),
 
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
+                            // Completed hours
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 20,
+                                  color: Colors.green,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Completed Hours: ${(stats['completedHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+
+                            // Streak
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.local_fire_department,
+                                  size: 20,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Streak: ${(stats['streak'] as int?) ?? 0} days',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+
+                            // Best day
+                            if (stats['bestDay'] != null) ...[
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.star,
+                                    size: 20,
+                                    color: Colors.amber,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Best Day: ${DateFormat('EEEE').format(stats['bestDay'] as DateTime)} (${(stats['bestDayHours'] as double?)?.toStringAsFixed(1) ?? '0.0'}h)',
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }
@@ -904,23 +918,34 @@ class _WeekCardState extends State<_WeekCard> {
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ],
-                ) : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                ) : Row(
                   children: [
-                    Text(
-                      _getDisplayName(),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _getDisplayName(),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${DateFormat('MMM d').format(widget.monday)} to ${DateFormat('MMM d, yyyy').format(widget.monday.add(const Duration(days: 6)))}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.normal,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${DateFormat('MMM d').format(widget.monday)} to ${DateFormat('MMM d, yyyy').format(widget.monday.add(const Duration(days: 6)))}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.normal,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                      ),
+                    Icon(
+                      Icons.expand_more,
+                      size: 24,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ],
                 ),
@@ -928,22 +953,85 @@ class _WeekCardState extends State<_WeekCard> {
             ),
 
             // Show daily cards and stats when expanded
-            if (widget.isExpanded) ...[
-              const SizedBox(height: 12),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutBack,
+              alignment: Alignment.topCenter,
+              child: widget.isExpanded ? Container(
+                margin: const EdgeInsets.only(top: 12),
+                child: Column(
+                  children: [
+                    // Fixed width layout to prevent flashing - proper 50/50 split accounting for divider
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final availableWidth = constraints.maxWidth;
 
-              // Week notes field
-              _buildWeekNotesField(),
+                        // Calculate divider's total space: width + left margin + right margin
+                        const dividerWidth = 2.0;
+                        const dividerHorizontalMargin = 8.0;
+                        const dividerTotalSpace = dividerWidth + (dividerHorizontalMargin * 2); // 2 + 16 = 18
 
-              const SizedBox(height: 12),
+                        // Subtract divider space from available width to get content width
+                        final contentWidth = availableWidth - dividerTotalSpace;
 
-              // Daily cards for all 7 days of the week
-              ..._buildAllWeekDays(),
+                        // Divide remaining content width equally between the two sections
+                        // ignore: unused_local_variable
+                        final sectionWidth = contentWidth / 2;
 
-              const SizedBox(height: 12),
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Left section: Notes and stats (proper width)
+                                Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.surface.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        _buildWeekNotesField(),
+                                        const SizedBox(height: 12),
+                                        _buildWeekStatsSection(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
 
-              // Stats toggle and display
-              _buildWeekStatsSection(),
-            ],
+                                // Vertical divider to separate sections - now with proper height!
+                                Container(
+                                  width: 2,
+                                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
+                                    borderRadius: BorderRadius.circular(1),
+                                  ),
+                                ),
+
+                                // Right section: Days (proper width)
+                                Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.only(left: 8),
+                                    child: Column(
+                                      children: _buildAllWeekDays(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ) : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
@@ -957,9 +1045,10 @@ class _HistoryCard extends StatefulWidget {
   final DateTime date;
   final bool isToday;
   final bool isExpanded;
-  final VoidCallback onToggleExpand;
+  final void Function(BuildContext) onToggleExpand;
 
   const _HistoryCard({
+    super.key,
     required this.date,
     required this.isToday,
     required this.isExpanded,
@@ -972,10 +1061,30 @@ class _HistoryCard extends StatefulWidget {
 
 class _HistoryCardState extends State<_HistoryCard> {
   final Set<String> _expandedTasks = {}; // Track expanded tasks by ID
+  List<Task>? _tasks;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
+    if (!widget.isToday) { // Only load data for past days
+      _loadDataForCard().then((tasks) {
+        if (mounted) {
+          setState(() {
+            _tasks = tasks;
+            _isLoading = false;
+          });
+        }
+      }).catchError((error) {
+        if (mounted) {
+          setState(() {
+            _error = 'Failed to load tasks.';
+            _isLoading = false;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -1001,102 +1110,84 @@ class _HistoryCardState extends State<_HistoryCard> {
   @override
   Widget build(BuildContext context) {
     if (widget.isToday) {
-      // For today's card, use Consumer to get live updates from TaskProvider
+      // Today's card still uses Consumer for live updates
       return Consumer<TaskProvider>(
         builder: (context, provider, child) {
           final tasks = provider.tasks;
-          final completedTasks = tasks.where((t) => t.isDone).toList();
-          final totalPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
-          // Use sum of planned hours for completed tasks
-          final totalHours = totalPlanned;
-
-          return AppCard(
-            padding: const EdgeInsets.all(6.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildCardHeader(
-                  tasks: tasks,
-                  totalPlanned: totalPlanned,
-                  totalHours: totalHours,
-                ),
-                if (widget.isExpanded)
-                  _buildTodayTaskList(tasks: tasks),
-              ],
-            ),
-          );
-        },
-      );
-    } else {
-      // For previous days, load data from storage
-      return FutureBuilder<List<Task>>(
-        future: _loadDataForCard(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const AppCard(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            );
-          }
-
-          if (snapshot.hasError) {
-            print('HistoryCard: Error in FutureBuilder: ${snapshot.error}');
-            return AppCard(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Center(
-                  child: Text(
-                    'Error loading data: ${snapshot.error}',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          final tasks = snapshot.data ?? [];
-          final completedTasks = tasks.where((t) => t.isDone).toList();
-          final totalPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
-          final totalHours = totalPlanned;
-
-          return AppCard(
-            padding: const EdgeInsets.all(6.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildCardHeader(
-                  tasks: tasks,
-                  totalPlanned: totalPlanned,
-                  totalHours: totalHours,
-                ),
-                if (widget.isExpanded)
-                  _buildArchivedTaskList(tasks: tasks),
-              ],
-            ),
-          );
+          return _buildCardContent(tasks); // Build content directly
         },
       );
     }
+
+    // For past days, use our new state variables
+    if (_isLoading) {
+      // Show a simple header while loading in the background
+      return AppCard(
+        padding: const EdgeInsets.all(6.0),
+        child: _buildCardHeader(tasks: [], totalPlanned: 0, totalHours: 0),
+      );
+    }
+
+    if (_error != null) {
+      // Build an error state view
+      return AppCard(
+        padding: const EdgeInsets.all(6.0),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            _error!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+      );
+    }
+
+    return _buildCardContent(_tasks ?? []);
+  }
+
+  // Helper method to build the actual card UI to avoid code duplication
+  Widget _buildCardContent(List<Task> tasks) {
+    final completedTasks = tasks.where((t) => t.isDone).toList();
+    final totalPlanned = completedTasks.fold(0.0, (sum, task) => sum + task.plannedHours.toDouble());
+
+    return AppCard(
+      padding: const EdgeInsets.all(6.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(
+            tasks: tasks,
+            totalPlanned: totalPlanned,
+            totalHours: totalPlanned,
+          ),
+          // The animation will now work correctly!
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: widget.isExpanded
+                ? (widget.isToday ? _buildTodayTaskList(tasks: tasks) : _buildArchivedTaskList(tasks: tasks))
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
   }
 
   // Helper method to load data for historical cards
   Future<List<Task>> _loadDataForCard() async {
     if (widget.isToday) return []; // Today's data comes from provider
 
-    print('HistoryCard: Loading data for date ${widget.date}');
-
+    print('DEBUG: Attempting to load tasks for date: ${widget.date}');
     try {
       final provider = Provider.of<TaskProvider>(context, listen: false);
       final tasks = await provider.loadTasksForDate(widget.date);
-      print('HistoryCard: Loaded ${tasks.length} tasks for ${widget.date}');
-
+      print('DEBUG: Successfully loaded ${tasks.length} tasks for ${widget.date}');
       return tasks;
     } catch (e, stackTrace) {
-      print('HistoryCard: Error loading data for card ${widget.date}: $e');
-      print('HistoryCard: Stack trace: $stackTrace');
-      return [];
+      print('DEBUG: ERROR loading tasks for ${widget.date}: $e');
+      print('DEBUG: Stack trace: $stackTrace');
+      // Re-throw the error to be caught by the catchError block
+      rethrow;
     }
   }
 
@@ -1113,7 +1204,7 @@ class _HistoryCardState extends State<_HistoryCard> {
         : tasks.where((t) => t.isDone).length;
 
     return GestureDetector(
-      onTap: widget.onToggleExpand, // Make the header area trigger expansion
+      onTap: () => widget.onToggleExpand(context), // Make the header area trigger expansion
       behavior: HitTestBehavior.opaque,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1197,7 +1288,7 @@ class _HistoryCardState extends State<_HistoryCard> {
         decoration: BoxDecoration(
           color: totalHours > 0
               ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-              : Theme.of(context).colorScheme.surfaceVariant,
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -1249,7 +1340,7 @@ class _TaskItem extends StatelessWidget {
                 Expanded(
                   child: Text(
                     task.title,
-                    style: const TextStyle(fontSize: 16),
+                    style: const TextStyle(fontSize: 14, fontFamily: 'Roboto'),
                   ),
                 ),
                 // Blue dot indicator for tasks with notes
@@ -1290,8 +1381,10 @@ class _TaskItem extends StatelessWidget {
         ),
 
         // Expanded completion details
-        if (isExpanded && (task.completionDescription?.isNotEmpty == true || task.rating != null))
-          Container(
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          child: (isExpanded && (task.completionDescription?.isNotEmpty == true || task.rating != null)) ? Container(
             margin: const EdgeInsets.only(top: 4.0, left: 32.0, right: 8.0),
             padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
@@ -1335,7 +1428,8 @@ class _TaskItem extends StatelessWidget {
                   ),
               ],
             ),
-          ),
+          ) : const SizedBox.shrink(),
+        ),
       ],
     );
   }

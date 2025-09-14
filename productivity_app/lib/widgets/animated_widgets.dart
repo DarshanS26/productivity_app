@@ -198,3 +198,82 @@ class _AnimatedPressableState extends State<AnimatedPressable>
     );
   }
 }
+
+class AnimatedVisibility extends StatefulWidget {
+  final Widget child;
+  final bool visible;
+  final Duration duration;
+  final Curve curve;
+
+  const AnimatedVisibility({
+    super.key,
+    required this.child,
+    required this.visible,
+    this.duration = const Duration(milliseconds: 300),
+    this.curve = Curves.easeInOut,
+  });
+
+  @override
+  State<AnimatedVisibility> createState() => _AnimatedVisibilityState();
+}
+
+class _AnimatedVisibilityState extends State<AnimatedVisibility>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: widget.duration,
+      vsync: this,
+    );
+
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: widget.curve,
+    ));
+
+    if (widget.visible) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AnimatedVisibility oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible != oldWidget.visible) {
+      if (widget.visible) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _opacityAnimation.value,
+          child: Visibility(
+            visible: widget.visible,
+            child: widget.child,
+          ),
+        );
+      },
+    );
+  }
+}
